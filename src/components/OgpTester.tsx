@@ -141,4 +141,4 @@ const OgpTester: React.FC = () => {
   );
 };
 
-export default OgpTester;
+export { OgpTester };

@@ -7,6 +7,12 @@ interface FormInputProps extends React.InputHTMLAttributes<HTMLInputElement> {
 }
 
 export function FormInput({ label, helpText, icon, className = '', ...props }: FormInputProps) {
+  // 値が undefined または null の場合は空文字列に変換して制御/非制御の警告を回避
+  const inputProps = {
+    ...props,
+    value: props.value === undefined || props.value === null ? '' : props.value
+  };
+
   return (
     <div>
       <label
@@ -22,7 +28,7 @@ export function FormInput({ label, helpText, icon, className = '', ...props }: F
           </div>
         )}
         <input
-          {...props}
+          {...inputProps}
           className={`
             block w-full rounded-lg border-neutral-300 shadow-sm
             focus:border-primary-500 focus:ring-primary-500

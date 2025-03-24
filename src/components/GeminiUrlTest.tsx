@@ -1,4 +1,4 @@
-import GeminiUrlTester from './GeminiUrlTester';
+import { GeminiUrlTester } from './GeminiUrlTester';
 
 export function GeminiUrlTest() {
   return (

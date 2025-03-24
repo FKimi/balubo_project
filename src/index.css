@@ -7,3 +7,18 @@
     font-feature-settings: "palt" 1;
   }
 }
+
+@keyframes progressGrow {
+  from {
+    width: 0;
+  }
+  to {
+    width: var(--progress-width);
+  }
+}
+
+@layer utilities {
+  .animate-progressGrow {
+    animation: progressGrow 1s ease-out forwards;
+  }
+}

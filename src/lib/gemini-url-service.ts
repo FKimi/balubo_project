@@ -22,16 +22,28 @@ export interface UrlExtractedData {
 export async function extractDataFromUrl(url: string): Promise<UrlExtractedData> {
   try {
     // APIキーを取得
-    const apiKey = import.meta.env.VITE_GEMINI_API_KEY || 'AIzaSyBiWIbXXRT0wDqHl8VdChfLmmBN_VKuseQ';
+    const apiKey = import.meta.env.VITE_GEMINI_API_KEY;
     
     if (!apiKey) {
-      throw new Error('Gemini API key is not set');
+      console.error('Gemini API key is not set in environment variables');
+      throw new Error('Gemini API key is not set in environment variables');
     }
     
     // Gemini APIの初期化
     const genAI = new GoogleGenerativeAI(apiKey);
+    
+    // 生成設定
+    const generationConfig = {
+      temperature: 0.7,
+      topP: 0.8,
+      topK: 40,
+      maxOutputTokens: 4096,
+    };
+    
+    // Get the model
     const model = genAI.getGenerativeModel({
-      model: 'gemini-pro',
+      model: "gemini-1.5-pro",
+      generationConfig,
       safetySettings: [
         {
           category: HarmCategory.HARM_CATEGORY_HARASSMENT,
@@ -95,34 +107,91 @@ export async function extractDataFromUrl(url: string): Promise<UrlExtractedData>
 - タグはスキルや技術に関連するものを優先してください
 `;
     
-    console.log('Sending prompt to Gemini API...');
+    console.log(`Analyzing URL: ${targetUrl}`);
     
-    // Gemini APIにリクエスト
-    const result = await model.generateContent(prompt);
-    const response = result.response;
-    const text = response.text();
-    
-    console.log('Received response from Gemini API');
-    
-    // JSONを抽出（余分なテキストがある場合に対応）
-    const jsonMatch = text.match(/\{[\s\S]*\}/);
-    if (!jsonMatch) {
-      throw new Error('Failed to extract JSON from Gemini API response');
+    try {
+      // Gemini APIにリクエスト
+      const result = await model.generateContent(prompt);
+      const response = result.response;
+      const text = response.text();
+      
+      console.log('Received response from Gemini API');
+      
+      // JSONを抽出（余分なテキストがある場合に対応）
+      const jsonMatch = text.match(/\{[\s\S]*\}/);
+      if (!jsonMatch) {
+        console.error(`Failed to extract JSON from Gemini API response: ${text.substring(0, 200)}`);
+        throw new Error(`Failed to extract JSON from Gemini API response`);
+      }
+      
+      const jsonText = jsonMatch[0];
+      
+      try {
+        const data = JSON.parse(jsonText) as UrlExtractedData;
+        
+        // 必須フィールドの確認と設定
+        return {
+          title: data.title || 'Untitled',
+          description: data.description || '',
+          imageUrl: data.imageUrl || undefined,
+          url: data.url || targetUrl,
+          tags: Array.isArray(data.tags) ? data.tags.filter(tag => tag && tag.name) : [],
+        };
+      } catch (jsonError) {
+        console.error('JSON parse error:', jsonError instanceof Error ? jsonError.message : String(jsonError));
+        console.error('Raw JSON text:', jsonText);
+        throw new Error(`Failed to parse JSON from Gemini API response: ${jsonError instanceof Error ? jsonError.message : String(jsonError)}`);
+      }
+    } catch (apiError) {
+      console.error('Gemini API error:', apiError instanceof Error ? apiError.message : String(apiError));
+      
+      // モデルが見つからないエラーの場合はフォールバックモデルを試す
+      if (apiError instanceof Error && apiError.message.includes('not found for API version')) {
+        console.log('Attempting with fallback model...');
+        try {
+          // フォールバックモデルを使用
+          const fallbackModel = genAI.getGenerativeModel({
+            model: "gemini-1.0-pro", // フォールバックモデル
+            generationConfig,
+          });
+          
+          const fallbackResult = await fallbackModel.generateContent(prompt);
+          const fallbackResponse = fallbackResult.response;
+          const fallbackText = fallbackResponse.text();
+          
+          // JSONを抽出
+          const fallbackJsonMatch = fallbackText.match(/\{[\s\S]*\}/);
+          if (!fallbackJsonMatch) {
+            throw new Error(`Failed to extract JSON from fallback model response`);
+          }
+          
+          const fallbackData = JSON.parse(fallbackJsonMatch[0]) as UrlExtractedData;
+          
+          return {
+            title: fallbackData.title || 'Untitled',
+            description: fallbackData.description || '',
+            imageUrl: fallbackData.imageUrl || undefined,
+            url: fallbackData.url || targetUrl,
+            tags: Array.isArray(fallbackData.tags) ? fallbackData.tags.filter(tag => tag && tag.name) : [],
+          };
+        } catch (fallbackError) {
+          console.error('Fallback model error:', fallbackError instanceof Error ? fallbackError.message : String(fallbackError));
+          throw new Error(`Failed with both primary and fallback models. Please try again later.`);
+        }
+      }
+      
+      throw new Error(`Gemini API error: ${apiError instanceof Error ? apiError.message : String(apiError)}`);
     }
-    
-    const jsonText = jsonMatch[0];
-    const data = JSON.parse(jsonText) as UrlExtractedData;
-    
-    // 必須フィールドの確認と設定
-    return {
-      title: data.title || 'Untitled',
-      description: data.description || '',
-      imageUrl: data.imageUrl || undefined,
-      url: data.url || targetUrl,
-      tags: Array.isArray(data.tags) ? data.tags : [],
-    };
   } catch (error) {
-    console.error('Error extracting data from URL:', error);
-    throw error;
+    console.error('Error extracting data from URL:', error instanceof Error ? error.message : String(error));
+    console.error('Stack trace:', error instanceof Error ? error.stack : 'No stack trace available');
+    
+    // エラーが発生した場合はデフォルト値を返す
+    return {
+      title: 'URL取得エラー',
+      description: 'URLからデータを取得できませんでした。手動で情報を入力してください。',
+      url: url,
+      tags: [{ name: 'エラー', relevance: 1.0 }],
+    };
   }
 }

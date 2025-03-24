@@ -37,7 +37,6 @@ const generationConfig = {
   topP: 0.9,
   topK: 40,
   maxOutputTokens: 4096,
-  responseMimeType: "text/plain",
 };
 
 /**
@@ -57,6 +56,9 @@ export async function generateTags(input: TagGenerationInput): Promise<TagAnalys
     const genAI = new GoogleGenerativeAI(GEMINI_API_KEY);
     
     try {
+      // モデル初期化前にログを追加
+      console.log("Initializing Gemini 2.0 Flash model...");
+      
       const model = genAI.getGenerativeModel({
         model: "gemini-2.0-flash",
         generationConfig,
@@ -99,11 +101,11 @@ export async function generateTags(input: TagGenerationInput): Promise<TagAnalys
       `;
 
       try {
-        console.log("Gemini API - Starting tag generation...");
+        console.log("Gemini API - Starting tag generation with 2.0-flash model...");
         const result = await model.generateContent(prompt);
         const response = await result.response;
         const text = response.text();
-        console.log("Gemini API - Tag generation successful");
+        console.log("Gemini API - Tag generation successful with 2.0-flash model");
 
         try {
           // Extract JSON from the response if it's wrapped in markdown code blocks
@@ -130,20 +132,29 @@ export async function generateTags(input: TagGenerationInput): Promise<TagAnalys
         } catch (parseError) {
           console.error('Failed to parse Gemini response:', parseError);
           console.error('Raw response:', text);
-          throw new Error('Invalid response format from AI');
+          // パースエラーの場合はフォールバック分析を返す
+          console.warn('Falling back to pre-defined tags due to parse error');
+          return getFallbackTagAnalysis();
         }
       } catch (apiError) {
         console.error('Gemini API error with 2.0-flash model:', apiError);
+        // APIエラーの詳細をログに記録
+        if (apiError instanceof Error) {
+          console.error('Error details:', apiError.message, apiError.stack);
+        } else {
+          console.error('Unknown error type:', typeof apiError);
+        }
+        // フォールバックモデルを試す
         throw apiError;
       }
     } catch (modelError) {
       console.error('Error initializing or using Gemini 2.0 Flash model:', modelError);
-      console.warn('Falling back to gemini-1.5-pro model...');
+      console.warn('Falling back to gemini-1.0-pro model...');
       
-      // フォールバック: gemini-1.5-proを使用
+      // フォールバック: gemini-1.0-proを使用
       try {
         const fallbackModel = genAI.getGenerativeModel({
-          model: "gemini-1.5-pro",
+          model: "gemini-1.0-pro",
           generationConfig,
         });
         
@@ -182,20 +193,20 @@ export async function generateTags(input: TagGenerationInput): Promise<TagAnalys
           
           すべての応答は日本語で提供してください。
         `;
-
-        console.log("Gemini API - Starting tag generation with fallback model...");
-        const result = await fallbackModel.generateContent(prompt);
-        const response = await result.response;
-        const text = response.text();
-        console.log("Gemini API - Tag generation with fallback model successful");
-
+        
+        console.log("Gemini API - Starting tag generation with fallback 1.0-pro model...");
+        const fallbackResult = await fallbackModel.generateContent(prompt);
+        const fallbackResponse = await fallbackResult.response;
+        const fallbackText = fallbackResponse.text();
+        console.log("Gemini API - Tag generation successful with fallback model");
+        
         try {
           // Extract JSON from the response if it's wrapped in markdown code blocks
-          let jsonText = text;
+          let jsonText = fallbackText;
           
           // Check if the response is wrapped in markdown code blocks
           const jsonRegex = /```(?:json)?\s*([\s\S]*?)\s*```/;
-          const match = text.match(jsonRegex);
+          const match = fallbackText.match(jsonRegex);
           
           if (match && match[1]) {
             jsonText = match[1].trim();
@@ -203,26 +214,29 @@ export async function generateTags(input: TagGenerationInput): Promise<TagAnalys
           
           // Try to parse the response as JSON
           const tagAnalysis = JSON.parse(jsonText);
-
+          
           // Validate the analysis structure
           if (!tagAnalysis.tags || !tagAnalysis.clusters || !tagAnalysis.summary) {
-            console.error('Invalid tag analysis structure:', tagAnalysis);
-            throw new Error('Invalid tag analysis structure');
+            console.error('Invalid tag analysis structure from fallback model:', tagAnalysis);
+            throw new Error('Invalid tag analysis structure from fallback model');
           }
-
+          
           return tagAnalysis;
-        } catch (parseError) {
-          console.error('Failed to parse Gemini response:', parseError);
-          console.error('Raw response:', text);
-          throw new Error('Invalid response format from AI');
+        } catch (fallbackParseError) {
+          console.error('Failed to parse fallback Gemini response:', fallbackParseError);
+          console.error('Raw fallback response:', fallbackText);
+          // 最終的にフォールバック分析を返す
+          return getFallbackTagAnalysis();
         }
       } catch (fallbackError) {
-        console.error('Error with fallback model:', fallbackError);
+        console.error('Error with fallback Gemini model:', fallbackError);
+        // すべてのAPIアプローチが失敗した場合、フォールバック分析を返す
         return getFallbackTagAnalysis();
       }
     }
   } catch (error) {
-    console.error('Error in generateTags:', error);
+    console.error('Unhandled error in generateTags:', error);
+    // 最終的なフォールバック
     return getFallbackTagAnalysis();
   }
 }
@@ -247,8 +261,8 @@ export async function analyzeTagRelevance(tagNames: string[]): Promise<Array<{na
 
     // タグの出現回数をカウント
     const counts: Record<string, number> = {};
-    tagCounts.forEach((item: any) => {
-      const tagName = item.tags?.name;
+    tagCounts.forEach((item: { tag_id: string; tags: { name: string }[] }) => {
+      const tagName = item.tags?.[0]?.name;
       if (tagName) {
         counts[tagName] = (counts[tagName] || 0) + 1;
       }
@@ -451,9 +465,9 @@ export async function analyzeTagTimeline(userId: string): Promise<Array<{period:
     // 作品の作成日時でグループ化
     const tagsByMonth: Record<string, Record<string, number>> = {};
     
-    workTags.forEach((item: any) => {
-      const createdAt = item.works?.created_at;
-      const tagName = item.tags?.name;
+    workTags.forEach((item: { work_id: string; tag_id: string; tags: { name: string }[]; works: { created_at: string }[] }) => {
+      const createdAt = item.works?.[0]?.created_at;
+      const tagName = item.tags?.[0]?.name;
       
       if (createdAt && tagName) {
         // 年月のフォーマット（例：2025-03）
@@ -482,6 +496,140 @@ export async function analyzeTagTimeline(userId: string): Promise<Array<{period:
   } catch (error) {
     console.error('Error in analyzeTagTimeline:', error);
     return [];
+  }
+}
+
+// Netlify FunctionsのURL
+const NETLIFY_FUNCTIONS_BASE_URL = import.meta.env.PROD 
+  ? 'https://eclectic-queijadas-227e9b.netlify.app/.netlify/functions'
+  : '/.netlify/functions';
+
+/**
+ * タグ分析結果をデータベースに保存する関数
+ * @param userId ユーザーID
+ * @param tagAnalysis タグ分析結果
+ * @returns 保存結果
+ */
+export async function saveTagAnalytics(userId: string, tagAnalysis: TagAnalysisResult): Promise<{ success: boolean; error?: string }> {
+  try {
+    console.log(`saveTagAnalytics関数が呼び出されました: userId=${userId}`);
+    
+    // Netlify Functionsを使用してタグ分析結果を保存
+    try {
+      const response = await fetch(`${NETLIFY_FUNCTIONS_BASE_URL}/save-tag-analytics`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({ 
+          userId, 
+          tagAnalysis 
+        }),
+      });
+      
+      if (!response.ok) {
+        // APIエンドポイントからのエラーレスポンスを処理
+        const errorData = await response.json().catch(() => ({}));
+        console.error(`Error saving tag analytics via Netlify Function: ${response.status}`, errorData);
+        
+        // フォールバック: 直接データベースに保存を試みる
+        console.log('フォールバック処理を実行: 直接データベースに保存を試みます');
+        return await fallbackSaveTagAnalytics(userId, tagAnalysis);
+      }
+      
+      console.log('タグ分析結果を正常に保存しました');
+      // 成功レスポンスを返す
+      return { success: true };
+    } catch (apiError) {
+      console.error('Error calling save-tag-analytics Function:', apiError);
+      
+      // APIエンドポイントが利用できない場合は直接データベースに保存を試みる
+      console.log('フォールバック処理を実行: 直接データベースに保存を試みます');
+      return await fallbackSaveTagAnalytics(userId, tagAnalysis);
+    }
+  } catch (error) {
+    console.error('Error in saveTagAnalytics:', error);
+    return { success: false, error: error instanceof Error ? error.message : String(error) };
+  }
+}
+
+/**
+ * タグ分析結果をデータベースに直接保存するフォールバック関数
+ * APIエンドポイントが利用できない場合に使用
+ * @param userId ユーザーID
+ * @param tagAnalysis タグ分析結果
+ * @returns 保存結果
+ */
+async function fallbackSaveTagAnalytics(userId: string, tagAnalysis: TagAnalysisResult): Promise<{ success: boolean; error?: string }> {
+  try {
+    // タグトレンド（タグの出現頻度）
+    const tagTrends = {
+      tags: tagAnalysis.tags.map(tag => ({
+        name: tag.name,
+        relevance: tag.relevance
+      }))
+    };
+    
+    // タグクラスター
+    const tagClusters = {
+      clusters: tagAnalysis.clusters
+    };
+    
+    // タイムライン（空のオブジェクト、後で別の関数で更新）
+    const tagTimeline = {};
+    
+    // まず既存のレコードを確認
+    const { data: existingRecord, error: selectError } = await supabase
+      .from('tag_analytics')
+      .select('id')
+      .eq('user_id', userId)
+      .maybeSingle();
+    
+    if (selectError) {
+      console.error('Error checking existing tag analytics:', selectError);
+      return { success: false, error: selectError.message };
+    }
+    
+    let error;
+    
+    if (existingRecord) {
+      // 既存レコードがある場合は更新
+      const { error: updateError } = await supabase
+        .from('tag_analytics')
+        .update({
+          tag_trends: tagTrends,
+          tag_clusters: tagClusters,
+          tag_timeline: tagTimeline,
+          updated_at: new Date().toISOString()
+        })
+        .eq('id', existingRecord.id);
+      
+      error = updateError;
+    } else {
+      // 新規レコードを作成
+      const { error: insertError } = await supabase
+        .from('tag_analytics')
+        .insert({
+          user_id: userId,
+          tag_trends: tagTrends,
+          tag_clusters: tagClusters,
+          tag_timeline: tagTimeline,
+          created_at: new Date().toISOString(),
+          updated_at: new Date().toISOString()
+        });
+      
+      error = insertError;
+    }
+    
+    if (error) {
+      console.error('Error saving tag analytics:', error);
+      return { success: false, error: error.message };
+    }
+    
+    return { success: true };
+  } catch (error) {
+    console.error('Error in fallbackSaveTagAnalytics:', error);
+    return { success: false, error: error instanceof Error ? error.message : String(error) };
   }
 }
 
@@ -522,52 +670,4 @@ function getFallbackTagAnalysis(): TagAnalysisResult {
     ],
     summary: "テクノロジーとプログラミングを中心に、ウェブ開発とAIに強い関心を持つコンテンツです。UXデザインの要素も含まれています。"
   };
-}
-
-/**
- * タグ分析結果をデータベースに保存する関数
- * @param userId ユーザーID
- * @param tagAnalysis タグ分析結果
- * @returns 保存結果
- */
-export async function saveTagAnalytics(userId: string, tagAnalysis: TagAnalysisResult): Promise<{ success: boolean; error?: any }> {
-  try {
-    // タグトレンド（タグの出現頻度）
-    const tagTrends = {
-      tags: tagAnalysis.tags.map(tag => ({
-        name: tag.name,
-        relevance: tag.relevance
-      }))
-    };
-    
-    // タグクラスター
-    const tagClusters = {
-      clusters: tagAnalysis.clusters
-    };
-    
-    // タイムライン（空のオブジェクト、後で別の関数で更新）
-    const tagTimeline = {};
-    
-    // データベースに保存
-    const { data, error } = await supabase
-      .from('tag_analytics')
-      .upsert({
-        user_id: userId,
-        tag_trends: tagTrends,
-        tag_clusters: tagClusters,
-        tag_timeline: tagTimeline,
-        created_at: new Date().toISOString(),
-        updated_at: new Date().toISOString()
-      }, { onConflict: 'user_id' });
-    
-    if (error) {
-      console.error('Error saving tag analytics:', error);
-      return { success: false, error };
-    }
-    
-    return { success: true };
-  } catch (error) {
-    console.error('Error in saveTagAnalytics:', error);
-    return { success: false, error };
-  }
 }

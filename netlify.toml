@@ -40,6 +40,30 @@
     Access-Control-Allow-Methods = "GET, POST, OPTIONS"
     Access-Control-Allow-Headers = "Content-Type, Authorization"
 
+# タグ作成APIのヘッダー設定
+[[headers]]
+  for = "/.netlify/functions/create-tag"
+  [headers.values]
+    Access-Control-Allow-Origin = "*"
+    Access-Control-Allow-Methods = "GET, POST, OPTIONS"
+    Access-Control-Allow-Headers = "Content-Type, Authorization"
+
+# タグ分析保存APIのヘッダー設定
+[[headers]]
+  for = "/.netlify/functions/save-tag-analytics"
+  [headers.values]
+    Access-Control-Allow-Origin = "*"
+    Access-Control-Allow-Methods = "GET, POST, OPTIONS"
+    Access-Control-Allow-Headers = "Content-Type, Authorization"
+
+# ユーザーインサイト保存APIのヘッダー設定
+[[headers]]
+  for = "/.netlify/functions/save-user-insights"
+  [headers.values]
+    Access-Control-Allow-Origin = "*"
+    Access-Control-Allow-Methods = "GET, POST, OPTIONS"
+    Access-Control-Allow-Headers = "Content-Type, Authorization"
+
 # Netlify Functionsの設定
 [functions]
   node_bundler = "esbuild"

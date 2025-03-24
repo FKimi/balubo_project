@@ -27,15 +27,18 @@ interface ContentAnalysis {
     tags: string[];
     summary: string;
   };
+  appeal_points: {
+    points: Array<{ title: string; description: string }>;
+    summary: string;
+  };
 }
 
-// Gemini 2.0 Flashのモデル設定
+// Gemini Proのモデル設定
 const generationConfig = {
-  temperature: 1,
-  topP: 0.95,
+  temperature: 0.7,
+  topP: 0.8,
   topK: 40,
-  maxOutputTokens: 8192,
-  responseMimeType: "text/plain",
+  maxOutputTokens: 4096,
 };
 
 export async function analyzeContent(content: ContentInput): Promise<ContentAnalysis> {
@@ -49,211 +52,221 @@ export async function analyzeContent(content: ContentInput): Promise<ContentAnal
     // Initialize the API client
     const genAI = new GoogleGenerativeAI(GEMINI_API_KEY);
     
-    // Gemini 2.0 Flashモデルを使用
-    // 注: APIキーが2.0モデルに対応していない場合は1.5-proにフォールバック
     try {
+      // Get the model - 最新のモデル名を使用
       const model = genAI.getGenerativeModel({
-        model: "gemini-2.0-flash",
+        model: "gemini-1.5-pro",
         generationConfig,
       });
 
-      // Create a more structured prompt
+      // コンテンツの準備
+      const contentText = [
+        content.title,
+        content.description || '',
+        content.content || '',
+        content.url ? `URL: ${content.url}` : ''
+      ].filter(Boolean).join('\n\n');
+
+      // プロンプトの作成
       const prompt = `
-        あなたはプロの編集者であり、世界最高のトップクリエイターです。
-        またコンテンツの分析・推論・考察・評価の専門家です。クリエイターや発注者に新たな発見を提供する専門家です。
-        
-        以下のコンテンツを分析し、クリエイターに役立つ洞察と発見を日本語のJSONフォーマットで提供してください：
+# コンテンツ分析タスク
 
-        タイトル: ${content.title}
-        ${content.description ? `説明: ${content.description}` : ''}
-        ${content.url ? `URL: ${content.url}` : ''}
-        ${content.content ? `本文: ${content.content}` : ''}
+## 分析対象コンテンツ
+${contentText}
 
-        以下の3つの側面について分析し、それぞれJSONの対応するセクションに反映させてください。
-        情報が限られている場合は「可能性がある」「〜の傾向が見られる」といった表現を使用してください。140文字以内でお願いします。：
-        
-        1. 【専門性・分野】(JSONのexpertiseセクションに対応)
-              - コンテンツの専門分野やジャンルを分析
-   - 作者の知識深度や専門性の強みを推論
-      
-2. 【表現スタイル・特徴】(JSONのcontent_styleセクションに対応)
-   - 文章の特徴や表現技法を分析
-   - 想定読者層や訴求方法の特徴を推論
-      
-3. 【興味関心・トピック】(JSONのinterestsセクションに対応)
-   - 扱われているトピックや関心領域を分析
-   - 作者の探求している分野や将来性を推論
+## 分析指示
+このコンテンツを分析し、以下の情報を抽出してください：
+1. 専門分野カテゴリ（最大5つ、スコア付き）
+2. コンテンツスタイルの特徴（最大5つ、スコア付き）
+3. 関連する興味・タグ（最大10個）
+4. 作品の魅力ポイント（最大5つ、タイトルと説明付き）
 
+## 出力形式
+以下のJSON形式で出力してください：
 
-マークダウン形式やコードブロック、余分なテキストなしで、有効なJSONオブジェクトのみで応答してください。
-JSONの構造は以下の通りにしてください：
 {
   "expertise": {
     "categories": [
-      {"name": "カテゴリー名", "score": 90}  // スコアは0-100で、この分野への専門性・関連性の強さを表します
+      {"name": "カテゴリ名", "score": 0.9},
+      {"name": "カテゴリ名", "score": 0.8}
     ],
-    "summary": "専門性の要約（具体的な強みと独自の視点を含む）"
+    "summary": "専門性に関する簡潔な説明（1-2文）"
   },
   "content_style": {
     "features": [
-      {"name": "特徴", "score": 90}  // スコアは0-100で、この特徴の顕著さを表します
+      {"name": "特徴", "score": 0.9},
+      {"name": "特徴", "score": 0.8}
     ],
-    "summary": "作風の要約（表現技法の特徴と読者への影響を含む）"
+    "summary": "コンテンツスタイルに関する簡潔な説明（1-2文）"
   },
   "interests": {
-    "tags": ["トピック1", "トピック2"],  // 関連するトピックやキーワード
-    "summary": "興味関心の要約（将来の可能性と発展方向を含む）"
+    "tags": ["タグ1", "タグ2", "タグ3"],
+    "summary": "興味・関心に関する簡潔な説明（1-2文）"
+  },
+  "appeal_points": {
+    "points": [
+      {"title": "魅力ポイント1", "description": "魅力ポイント1の説明"},
+      {"title": "魅力ポイント2", "description": "魅力ポイント2の説明"}
+    ],
+    "summary": "魅力ポイントに関する簡潔な説明（1-2文）"
   }
 }
 
-すべての応答は日本語で提供してください。カテゴリー名、特徴名、タグ名、要約文はすべて日本語にしてください。
-要約文は単なる事実の羅列ではなく、具体的な例や独自の洞察を含む、発見のある内容にしてください。
-    `;
+## 注意事項
+- スコアは0.0から1.0の範囲で、関連度を表します
+- カテゴリ名や特徴は具体的かつ簡潔に
+- 専門分野は技術、ビジネス、芸術などの分野を指します
+- コンテンツスタイルは文章の特徴（論理的、物語的、説明的など）を指します
+- JSONのみを出力し、他の説明は含めないでください
+`;
 
-      // Generate content with error handling
+      console.log('Analyzing content with Gemini 1.5 Pro model...');
+      
+      // Generate content
+      const result = await model.generateContent(prompt);
+      const response = result.response;
+      const text = response.text();
+      
+      console.log('Received response from Gemini API');
+      
+      // JSONを抽出（余分なテキストがある場合に対応）
+      const jsonMatch = text.match(/\{[\s\S]*\}/);
+      if (!jsonMatch) {
+        console.error('Failed to extract JSON from Gemini response. Raw response:', text.substring(0, 200));
+        throw new Error('Failed to extract JSON from Gemini response');
+      }
+      
+      const jsonText = jsonMatch[0];
+      
       try {
-        console.log("Gemini API - Starting content generation...");
-        const result = await model.generateContent(prompt);
-        const response = await result.response;
-        const text = response.text();
-        console.log("Gemini API - Content generation successful");
-
-        try {
-          // Extract JSON from the response if it's wrapped in markdown code blocks
-          let jsonText = text;
-          
-          // Check if the response is wrapped in markdown code blocks
-          const jsonRegex = /```(?:json)?\s*([\s\S]*?)\s*```/;
-          const match = text.match(jsonRegex);
-          
-          if (match && match[1]) {
-            jsonText = match[1].trim();
+        // Parse the JSON response
+        const analysisData = JSON.parse(jsonText) as ContentAnalysis;
+        
+        // Validate and ensure all required fields exist
+        return {
+          expertise: {
+            categories: Array.isArray(analysisData.expertise?.categories) 
+              ? analysisData.expertise.categories 
+              : [],
+            summary: analysisData.expertise?.summary || ''
+          },
+          content_style: {
+            features: Array.isArray(analysisData.content_style?.features) 
+              ? analysisData.content_style.features 
+              : [],
+            summary: analysisData.content_style?.summary || ''
+          },
+          interests: {
+            tags: Array.isArray(analysisData.interests?.tags) 
+              ? analysisData.interests.tags 
+              : [],
+            summary: analysisData.interests?.summary || ''
+          },
+          appeal_points: {
+            points: Array.isArray(analysisData.appeal_points?.points) 
+              ? analysisData.appeal_points.points 
+              : [],
+            summary: analysisData.appeal_points?.summary || ''
           }
-          
-          // Try to parse the response as JSON
-          const analysis = JSON.parse(jsonText);
-
-          // Validate the analysis structure
-          if (!analysis.expertise?.categories || !analysis.content_style?.features || !analysis.interests?.tags) {
-            console.error('Invalid analysis structure:', analysis);
-            throw new Error('Invalid analysis structure');
-          }
-
-          return analysis;
-        } catch (parseError) {
-          console.error('Failed to parse Gemini response:', parseError);
-          console.error('Raw response:', text);
-          throw new Error('Invalid response format from AI');
-        }
-      } catch (apiError) {
-        console.error('Gemini API error with 2.0-flash model:', apiError);
-        // Try fallback to 1.5-pro
-        throw apiError;
+        };
+      } catch (jsonError) {
+        console.error('JSON parse error:', jsonError instanceof Error ? jsonError.message : String(jsonError));
+        console.error('Raw JSON text:', jsonText);
+        throw new Error(`Failed to parse JSON from Gemini response: ${jsonError instanceof Error ? jsonError.message : String(jsonError)}`);
       }
     } catch (modelError) {
-      console.error('Error initializing or using Gemini 2.0 Flash model:', modelError);
-      console.warn('Falling back to gemini-1.5-pro model...');
+      console.error('Gemini API error with 1.5 Pro model:', modelError instanceof Error ? modelError.message : String(modelError));
       
-      // フォールバック: gemini-1.5-proを使用
+      // Fallback to gemini-1.0-pro model
       try {
-        const fallbackModel = genAI.getGenerativeModel({
-          model: "gemini-1.5-pro"
-        });
+        console.log('Falling back to gemini-1.0-pro model...');
+        const fallbackModel = genAI.getGenerativeModel({ model: "gemini-1.0-pro" });
         
-        const prompt = `
-          あなたはプロの編集者であり、世界最高のトップクリエイターです。
-          またコンテンツの分析・推論・考察・評価の専門家です。クリエイターや発注者に新たな発見を提供する専門家です。
-          
-          以下のコンテンツを分析し、クリエイターに役立つ洞察と発見を日本語のJSONフォーマットで提供してください：
+        // コンテンツの準備
+        const contentText = [
+          content.title,
+          content.description || '',
+          content.content || '',
+          content.url ? `URL: ${content.url}` : ''
+        ].filter(Boolean).join('\n\n');
 
-          タイトル: ${content.title}
-          ${content.description ? `説明: ${content.description}` : ''}
-          ${content.url ? `URL: ${content.url}` : ''}
-          ${content.content ? `本文: ${content.content}` : ''}
+        // プロンプトの作成（gemini-1.0-proモデル用に簡略化）
+        const fallbackPrompt = `
+# コンテンツ分析
+以下のコンテンツを分析し、専門分野、スタイル、関連タグをJSON形式で出力してください：
 
-          以下の3つの側面について分析し、それぞれJSONの対応するセクションに反映させてください。
-          情報が限られている場合は「可能性がある」「〜の傾向が見られる」といった表現を使用してください。140文字以内でお願いします。：
-          
-          1. 【専門性・分野】(JSONのexpertiseセクションに対応)
-                - コンテンツの専門分野やジャンルを分析
-       - 作者の知識深度や専門性の強みを推論
-          
-    2. 【表現スタイル・特徴】(JSONのcontent_styleセクションに対応)
-       - 文章の特徴や表現技法を分析
-       - 想定読者層や訴求方法の特徴を推論
-          
-    3. 【興味関心・トピック】(JSONのinterestsセクションに対応)
-       - 扱われているトピックや関心領域を分析
-       - 作者の探求している分野や将来性を推論
+${contentText}
 
-    マークダウン形式やコードブロック、余分なテキストなしで、有効なJSONオブジェクトのみで応答してください。
-    JSONの構造は以下の通りにしてください：
-    {
-      "expertise": {
-        "categories": [
-          {"name": "カテゴリー名", "score": 90}  // スコアは0-100で、この分野への専門性・関連性の強さを表します
-        ],
-        "summary": "専門性の要約（具体的な強みと独自の視点を含む）"
-      },
-      "content_style": {
-        "features": [
-          {"name": "特徴", "score": 90}  // スコアは0-100で、この特徴の顕著さを表します
-        ],
-        "summary": "作風の要約（表現技法の特徴と読者への影響を含む）"
-      },
-      "interests": {
-        "tags": ["トピック1", "トピック2"],  // 関連するトピックやキーワード
-        "summary": "興味関心の要約（将来の可能性と発展方向を含む）"
-      }
-    }
+出力形式：
+{
+  "expertise": {
+    "categories": [{"name": "カテゴリ名", "score": 0.9}],
+    "summary": "専門性の説明"
+  },
+  "content_style": {
+    "features": [{"name": "特徴", "score": 0.9}],
+    "summary": "スタイルの説明"
+  },
+  "interests": {
+    "tags": ["タグ1", "タグ2"],
+    "summary": "興味の説明"
+  },
+  "appeal_points": {
+    "points": [{"title": "魅力ポイント1", "description": "魅力ポイント1の説明"}],
+    "summary": "魅力ポイントの説明"
+  }
+}
+`;
 
-    すべての応答は日本語で提供してください。カテゴリー名、特徴名、タグ名、要約文はすべて日本語にしてください。
-    要約文は単なる事実の羅列ではなく、具体的な例や独自の洞察を含む、発見のある内容にしてください。
-        `;
+        const fallbackResult = await fallbackModel.generateContent(fallbackPrompt);
+        const fallbackText = fallbackResult.response.text();
         
-        console.log("Gemini API - Trying with fallback model (gemini-1.5-pro)...");
-        const result = await fallbackModel.generateContent(prompt);
-        const response = await result.response;
-        const text = response.text();
-        console.log("Gemini API - Fallback model successful");
-          
-        // Parse JSON from the response
-        try {
-          // Extract JSON from the response if it's wrapped in markdown code blocks
-          let jsonText = text;
-          
-          // Check if the response is wrapped in markdown code blocks
-          const jsonRegex = /```(?:json)?\s*([\s\S]*?)\s*```/;
-          const match = text.match(jsonRegex);
-          
-          if (match && match[1]) {
-            jsonText = match[1].trim();
-          }
-          
-          // Try to parse the response as JSON
-          const analysis = JSON.parse(jsonText);
-
-          // Validate the analysis structure
-          if (!analysis.expertise?.categories || !analysis.content_style?.features || !analysis.interests?.tags) {
-            console.error('Invalid analysis structure from fallback model:', analysis);
-            throw new Error('Invalid analysis structure from fallback model');
-          }
-
-          return analysis;
-        } catch (fallbackParseError) {
-          console.error('Failed to parse fallback model response:', fallbackParseError);
-          console.error('Raw fallback response:', text);
-          throw new Error('Failed to parse AI response from both models');
+        // JSONを抽出
+        const fallbackJsonMatch = fallbackText.match(/\{[\s\S]*\}/);
+        if (!fallbackJsonMatch) {
+          console.error('Failed to extract JSON from fallback model. Raw response:', fallbackText.substring(0, 200));
+          throw new Error('Failed to extract JSON from fallback model response');
         }
-      } catch (fallbackModelError) {
-        console.error('Error with fallback model (gemini-1.5-pro):', fallbackModelError);
-        // Return default sample data
+        
+        const fallbackJsonText = fallbackJsonMatch[0];
+        const fallbackData = JSON.parse(fallbackJsonText) as ContentAnalysis;
+        
+        return {
+          expertise: {
+            categories: Array.isArray(fallbackData.expertise?.categories) 
+              ? fallbackData.expertise.categories 
+              : [],
+            summary: fallbackData.expertise?.summary || ''
+          },
+          content_style: {
+            features: Array.isArray(fallbackData.content_style?.features) 
+              ? fallbackData.content_style.features 
+              : [],
+            summary: fallbackData.content_style?.summary || ''
+          },
+          interests: {
+            tags: Array.isArray(fallbackData.interests?.tags) 
+              ? fallbackData.interests.tags 
+              : [],
+            summary: fallbackData.interests?.summary || ''
+          },
+          appeal_points: {
+            points: Array.isArray(fallbackData.appeal_points?.points) 
+              ? fallbackData.appeal_points.points 
+              : [],
+            summary: fallbackData.appeal_points?.summary || ''
+          }
+        };
+      } catch (fallbackError) {
+        console.error('Error with fallback model:', fallbackError instanceof Error ? fallbackError.message : String(fallbackError));
+        console.error('Error initializing or using Gemini 1.5 Pro model:', modelError instanceof Error ? modelError.message : String(modelError));
+        // Return fallback analysis if both models fail
         return getFallbackAnalysis();
       }
     }
   } catch (error) {
-    console.error('Content analysis error:', error);
-    // Return a fallback analysis
+    console.error('Error analyzing content:', error instanceof Error ? error.message : String(error));
+    console.error('Stack trace:', error instanceof Error ? error.stack : 'No stack trace available');
     return getFallbackAnalysis();
   }
 }
@@ -281,6 +294,13 @@ function getFallbackAnalysis(): ContentAnalysis {
     interests: {
       tags: ["情報デザイン", "ユーザー心理", "コミュニケーション設計", "学習体験"],
       summary: "情報とユーザーの関係性に深い関心を持ち、より効果的なコミュニケーション方法を追求しています。今後は認知科学やユーザー心理学の知見を取り入れることで、さらに影響力のあるコンテンツ制作が可能になるでしょう。特に「複雑さをシンプルに変換する」能力を活かした教育コンテンツや意思決定支援ツールの開発に大きな可能性があります。"
+    },
+    appeal_points: {
+      points: [
+        { title: "魅力ポイント1", description: "魅力ポイント1の説明" },
+        { title: "魅力ポイント2", description: "魅力ポイント2の説明" }
+      ],
+      summary: "魅力ポイントに関する簡潔な説明（1-2文）"
     }
   };
 }
@@ -296,13 +316,13 @@ export async function testGeminiAPI(): Promise<{ success: boolean; message: stri
     const genAI = new GoogleGenerativeAI(GEMINI_API_KEY);
     
     try {
-      // まずGemini 2.0 Flashを試す
+      // まずGemini 1.5 Proを試す
       const model = genAI.getGenerativeModel({
-        model: "gemini-2.0-flash",
+        model: "gemini-1.5-pro",
         generationConfig
       });
 
-      console.log("Testing Gemini 2.0 Flash API...");
+      console.log("Testing Gemini 1.5 Pro API...");
       // Simple test prompt
       const result = await model.generateContent("What is AI? Explain in one sentence.");
       const response = await result.response;
@@ -314,18 +334,18 @@ export async function testGeminiAPI(): Promise<{ success: boolean; message: stri
 
       return {
         success: true,
-        message: 'API test successful with gemini-2.0-flash',
+        message: 'API test successful with gemini-1.5-pro',
         response: text
       };
     } catch (error2) {
-      console.warn('Failed to use gemini-2.0-flash, falling back to gemini-1.5-pro:', error2);
+      console.warn('Failed to use gemini-1.5-pro, falling back to gemini-1.0-pro:', error2);
       
-      // フォールバック: gemini-1.5-proを使用
+      // フォールバック: gemini-1.0-proを使用
       const fallbackModel = genAI.getGenerativeModel({
-        model: "gemini-1.5-pro"
+        model: "gemini-1.0-pro"
       });
       
-      console.log("Testing with fallback model (gemini-1.5-pro)...");
+      console.log("Testing with fallback model (gemini-1.0-pro)...");
       const result = await fallbackModel.generateContent("What is AI? Explain in one sentence.");
       const response = await result.response;
       const text = response.text();
@@ -336,7 +356,7 @@ export async function testGeminiAPI(): Promise<{ success: boolean; message: stri
 
       return {
         success: true,
-        message: 'API test successful with fallback model (gemini-1.5-pro)',
+        message: 'API test successful with fallback model (gemini-1.0-pro)',
         response: text
       };
     }

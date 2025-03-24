@@ -1,7 +1,7 @@
-import React, { useEffect, useState } from 'react';
+import { useEffect, useState } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import { supabase } from '../lib/supabase';
-import { ArrowLeft, Globe, Twitter, Instagram, Facebook, Bot } from 'lucide-react';
+import { ArrowLeft, Globe, Twitter, Instagram, Facebook, Bot, SquarePen } from 'lucide-react';
 
 type UserProfile = {
   id: string;
@@ -20,6 +20,18 @@ export function Profile() {
   const [profile, setProfile] = useState<UserProfile | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
+  const [currentUserId, setCurrentUserId] = useState<string | null>(null);
+
+  useEffect(() => {
+    const getCurrentUser = async () => {
+      const { data: { user } } = await supabase.auth.getUser();
+      if (user) {
+        setCurrentUserId(user.id);
+      }
+    };
+
+    getCurrentUser();
+  }, []);
 
   useEffect(() => {
     const fetchProfile = async () => {
@@ -105,7 +117,21 @@ export function Profile() {
                 </div>
               )}
               <div className="ml-4">
-                <h1 className="text-2xl font-bold text-gray-900">{profile.name || '名前未設定'}</h1>
+                <div className="flex items-center">
+                  <h1 className="text-2xl font-bold text-gray-900">{profile.name || '名前未設定'}</h1>
+                  {currentUserId === profile.id && (
+                    <button
+                      onClick={() => {
+                        console.log('プロフィール編集ボタンがクリックされました');
+                        navigate('/settings');
+                      }}
+                      className="ml-2 inline-flex items-center justify-center font-medium rounded-md transition-colors bg-white text-gray-700 border border-gray-300 hover:bg-gray-50 px-3 py-1.5 text-sm"
+                    >
+                      <SquarePen className="h-4 w-4 mr-2" />
+                      プロフィールを編集
+                    </button>
+                  )}
+                </div>
                 <div className="mt-1 flex items-center space-x-4">
                   {profile.website_url && (
                     <a

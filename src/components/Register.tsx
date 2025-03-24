@@ -41,13 +41,13 @@ export function Register() {
 
           await refreshProfile();
           
-          navigate('/dashboard');
+          navigate('/mypage');
         } catch (err) {
           console.error('Error in profile creation:', err);
           setError(err instanceof Error ? err.message : '予期せぬエラーが発生しました');
         }
       } else if (user && profile) {
-        navigate('/dashboard');
+        navigate('/mypage');
       }
     };
 
@@ -106,7 +106,7 @@ export function Register() {
 
       await refreshProfile();
 
-      navigate('/dashboard');
+      navigate('/mypage');
     } catch (err) {
       console.error('Registration error:', err);
       setError(err instanceof Error ? err.message : '予期せぬエラーが発生しました');

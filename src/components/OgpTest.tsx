@@ -1,5 +1,4 @@
-import React from 'react';
-import OgpTester from './OgpTester';
+import { OgpTester } from './OgpTester';
 
 export function OgpTest() {
   return (

@@ -2,12 +2,12 @@ import { supabase } from '../lib/supabase';
 import { 
   TagGenerationInput, 
   TagAnalysisResult, 
-  generateTags, 
-  analyzeTagRelevance, 
-  clusterTags, 
-  analyzeTagTimeline,
+  generateTags,
   saveTagAnalytics
 } from '../lib/tag-analysis';
+import { GoogleGenerativeAI } from '@google/generative-ai';
+
+const GEMINI_API_KEY = import.meta.env.VITE_GEMINI_API_KEY || '';
 
 /**
  * 作品のタグを自動生成するAPIエンドポイント
@@ -63,7 +63,7 @@ export async function generateTagsForWork(workId: string): Promise<{ success: bo
  * @param userId ユーザーID
  * @returns タグ分析結果
  */
-export async function analyzeUserTags(userId: string): Promise<{ success: boolean; data?: any; error?: string }> {
+export async function analyzeUserTags(userId: string): Promise<{ success: boolean; data?: Record<string, any>; error?: string }> {
   try {
     // ユーザーの作品を取得
     const { data: works, error: worksError } = await supabase
@@ -96,54 +96,122 @@ export async function analyzeUserTags(userId: string): Promise<{ success: boolea
       }
       
       if (workTags && workTags.length > 0) {
-        workTags.forEach((item: any) => {
+        workTags.forEach((item: { tags?: { name: string } }) => {
           const tagName = item.tags?.name;
           if (tagName) {
             allTags[tagName] = (allTags[tagName] || 0) + 1;
           }
         });
-      } else {
-        // タグがない場合は自動生成
-        try {
-          const tagResult = await generateTagsForWork(work.id);
-          if (tagResult.success && tagResult.data) {
-            tagResult.data.tags.forEach(tag => {
-              allTags[tag.name] = (allTags[tag.name] || 0) + 1;
-            });
-          }
-        } catch (genError) {
-          console.error(`Error generating tags for work ${work.id}:`, genError);
-        }
       }
     }
-    
-    // タグを出現頻度でソート
+
+    // タグが見つからない場合
+    if (Object.keys(allTags).length === 0) {
+      return { 
+        success: true, 
+        data: {
+          expertise: { summary: "まだ十分なデータがないため、専門性を分析できません。作品にタグを追加してください。" },
+          content_style: { summary: "まだ十分なデータがないため、コンテンツスタイルを分析できません。作品にタグを追加してください。" },
+          uniqueness: { summary: "まだ十分なデータがないため、作品のユニークさを分析できません。作品にタグを追加してください。" },
+          specialties: [],
+          interests: { topics: [] }
+        } 
+      };
+    }
+
+    // タグを頻度順にソート
     const sortedTags = Object.entries(allTags)
-      .map(([name, count]) => ({ name, count }))
-      .sort((a, b) => b.count - a.count);
-    
-    // タグの関連性を分析
-    const tagNames = sortedTags.map(tag => tag.name);
-    const tagsWithRelevance = await analyzeTagRelevance(tagNames);
-    
-    // タグをクラスタリング
-    const clusters = await clusterTags(tagsWithRelevance);
-    
-    // タグのタイムライン分析
-    const timeline = await analyzeTagTimeline(userId);
-    
-    // 結果をまとめる
-    const analysisResult = {
-      tags: tagsWithRelevance,
-      clusters,
-      timeline,
-      summary: `${tagsWithRelevance.length}個のタグが分析され、${clusters.length}個のクラスターに分類されました。`
-    };
-    
-    // 分析結果をデータベースに保存
-    await saveTagAnalytics(userId, analysisResult as TagAnalysisResult);
-    
-    return { success: true, data: analysisResult };
+      .sort((a, b) => b[1] - a[1])
+      .map(([name, count]) => ({ name, count }));
+
+    // 上位のタグを抽出
+    const topTags = sortedTags.slice(0, 15).map(tag => tag.name);
+
+    // Gemini APIを使用してタグ分析を行う
+    const genAI = new GoogleGenerativeAI(GEMINI_API_KEY);
+    const model = genAI.getGenerativeModel({ model: "gemini-pro" });
+
+    // プロンプトを作成
+    const prompt = `
+以下のタグリストは、あるクリエイターの作品に付けられたタグです。これらのタグを分析して、クリエイターの特徴を3つの観点から分析してください。
+
+タグリスト: ${topTags.join(', ')}
+
+以下の3つの観点から分析し、それぞれ100-150文字程度の日本語で簡潔に説明してください:
+
+1. 専門性: このクリエイターの専門分野や得意とする領域は何か
+2. コンテンツスタイル: このクリエイターの表現方法や作品の特徴的なスタイルは何か
+3. 作品のユニークさ: このクリエイターの作品が持つ独自性や他と差別化できる点は何か
+
+回答はJSON形式で以下のように構造化してください:
+{
+  "expertise": {
+    "summary": "専門性の分析結果"
+  },
+  "content_style": {
+    "summary": "コンテンツスタイルの分析結果"
+  },
+  "uniqueness": {
+    "summary": "作品のユニークさの分析結果"
+  }
+}
+`;
+
+    try {
+      const result = await model.generateContent(prompt);
+      const response = await result.response;
+      const text = response.text();
+      
+      // JSONを抽出して解析
+      const jsonMatch = text.match(/\{[\s\S]*\}/);
+      if (jsonMatch) {
+        const jsonText = jsonMatch[0];
+        const analysisData = JSON.parse(jsonText);
+        
+        // 専門分野タグを抽出（上位10件）
+        const specialties = sortedTags.slice(0, 10).map(tag => tag.name);
+        
+        // 興味関心タグを抽出（11-20件）
+        const interests = {
+          topics: sortedTags.slice(10, 20).map(tag => tag.name)
+        };
+        
+        return { 
+          success: true, 
+          data: {
+            ...analysisData,
+            specialties,
+            interests
+          } 
+        };
+      } else {
+        console.error('Failed to extract JSON from AI response');
+        return { 
+          success: true, 
+          data: {
+            expertise: { summary: "タグに基づく専門性の分析に失敗しました。" },
+            content_style: { summary: "タグに基づくコンテンツスタイルの分析に失敗しました。" },
+            uniqueness: { summary: "タグに基づく作品のユニークさの分析に失敗しました。" },
+            specialties: sortedTags.slice(0, 10).map(tag => tag.name),
+            interests: { topics: sortedTags.slice(10, 20).map(tag => tag.name) }
+          } 
+        };
+      }
+    } catch (error) {
+      console.error('Error analyzing tags with Gemini:', error);
+      
+      // AI分析に失敗した場合のフォールバック
+      return { 
+        success: true, 
+        data: {
+          expertise: { summary: "タグから抽出された専門性: " + topTags.slice(0, 3).join(', ') },
+          content_style: { summary: "タグから抽出されたコンテンツスタイル: " + topTags.slice(3, 6).join(', ') },
+          uniqueness: { summary: "タグから抽出された作品のユニークさ: " + topTags.slice(6, 9).join(', ') },
+          specialties: sortedTags.slice(0, 10).map(tag => tag.name),
+          interests: { topics: sortedTags.slice(10, 20).map(tag => tag.name) }
+        } 
+      };
+    }
   } catch (error) {
     console.error('Error in analyzeUserTags:', error);
     return { success: false, error: 'Failed to analyze user tags' };
@@ -335,7 +403,7 @@ export async function getRelatedTags(tagName: string, limit: number = 10): Promi
     // タグの出現回数をカウント
     const tagCounts: Record<string, { id: string; name: string; count: number }> = {};
     
-    relatedWorkTags.forEach((item: any) => {
+    relatedWorkTags.forEach((item: { tag_id: string; tags?: { name: string } }) => {
       const tagId = item.tag_id;
       const tagName = item.tags?.name;
       

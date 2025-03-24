@@ -4,10 +4,20 @@ import {
   generateTags, 
   analyzeTagTimeline 
 } from '../lib/tag-analysis';
-import { 
-  BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, Legend, ResponsiveContainer,
-  PieChart, Pie, Cell
+import {
+  BarChart,
+  Bar,
+  XAxis,
+  YAxis,
+  CartesianGrid,
+  Tooltip,
+  ResponsiveContainer,
+  PieChart,
+  Pie,
+  Cell
 } from 'recharts';
+import TagTimelineChart, { TagTimelineData } from './TagTimelineChart';
+import TagForceGraph from './TagForceGraph';
 
 interface TagAnalysisProps {
   userId: string;
@@ -15,6 +25,7 @@ interface TagAnalysisProps {
   description?: string;
   url?: string;
   content?: string;
+  onTagSelect?: (tags: Array<{name: string; relevance: number}>) => void;
 }
 
 const COLORS = ['#0088FE', '#00C49F', '#FFBB28', '#FF8042', '#8884D8', '#82ca9d'];
@@ -24,46 +35,66 @@ const TagAnalysis: React.FC<TagAnalysisProps> = ({
   title, 
   description, 
   url, 
-  content 
+  content,
+  onTagSelect 
 }) => {
   const [loading, setLoading] = useState<boolean>(true);
   const [error, setError] = useState<string | null>(null);
   const [tagAnalysis, setTagAnalysis] = useState<TagAnalysisResult | null>(null);
-  const [timeline, setTimeline] = useState<Array<{period: string; tags: Array<{name: string; count: number}>}>>([]);
-  const [activeCluster, setActiveCluster] = useState<number>(0);
+  const [timeline, setTimeline] = useState<TagTimelineData[]>([]);
+  const [activeTab, setActiveTab] = useState<'overview' | 'clusters' | 'timeline'>('overview');
+  const [selectedTags, setSelectedTags] = useState<Array<{name: string; relevance: number}>>([]);
 
   useEffect(() => {
     const fetchTagAnalysis = async () => {
       try {
         setLoading(true);
         setError(null);
-
-        // 1. タグ生成
-        const analysisResult = await generateTags({
-          title,
-          description,
-          url,
-          content
-        });
-
+        
+        // タグ分析を実行
+        const analysisResult = await generateTags({ title, description, url, content });
         setTagAnalysis(analysisResult);
-
-        // 2. タイムライン分析（ユーザーの過去の作品からタグの傾向を分析）
-        if (userId) {
-          const timelineData = await analyzeTagTimeline(userId);
-          setTimeline(timelineData);
-        }
-
+        
+        // タイムライン分析を実行
+        const timelineData = await analyzeTagTimeline(userId);
+        setTimeline(timelineData);
       } catch (err) {
-        console.error('Error in tag analysis:', err);
-        setError('タグ分析中にエラーが発生しました');
+        console.error('タグ分析エラー:', err);
+        setError('タグ分析中にエラーが発生しました。');
       } finally {
         setLoading(false);
       }
     };
-
+    
     fetchTagAnalysis();
-  }, [title, description, url, content, userId]);
+  }, [userId, title, description, url, content]);
+
+  // タグの選択状態を切り替える
+  const toggleTagSelection = (tag: {name: string; relevance: number}) => {
+    setSelectedTags(prev => {
+      const isSelected = prev.some(t => t.name === tag.name);
+      
+      if (isSelected) {
+        // すでに選択されている場合は削除
+        return prev.filter(t => t.name !== tag.name);
+      } else {
+        // 選択されていない場合は追加
+        return [...prev, tag];
+      }
+    });
+  };
+
+  // 選択されたタグを親コンポーネントに通知
+  const applySelectedTags = () => {
+    if (onTagSelect && selectedTags.length > 0) {
+      onTagSelect(selectedTags);
+    }
+  };
+
+  // タグが選択されているかチェック
+  const isTagSelected = (tagName: string) => {
+    return selectedTags.some(tag => tag.name === tagName);
+  };
 
   // タグクラスターの表示
   const renderTagClusters = () => {
@@ -74,43 +105,39 @@ const TagAnalysis: React.FC<TagAnalysisProps> = ({
     return (
       <div className="mb-8">
         <h3 className="text-lg font-semibold mb-2">タグクラスター</h3>
-        <div className="flex gap-2 mb-4">
-          {tagAnalysis.clusters.map((cluster, index) => (
-            <button
-              key={index}
-              className={`px-3 py-1 rounded text-sm ${
-                activeCluster === index
-                  ? 'bg-indigo-600 text-white'
-                  : 'bg-gray-200 hover:bg-gray-300'
-              }`}
-              onClick={() => setActiveCluster(index)}
-            >
-              {cluster.name}
-            </button>
-          ))}
-        </div>
-
-        <div className="bg-gray-50 p-4 rounded-lg">
-          <h4 className="font-medium mb-2">{tagAnalysis.clusters[activeCluster].name}</h4>
-          <div className="flex flex-wrap gap-2">
-            {tagAnalysis.clusters[activeCluster].tags.map((tagName, index) => {
-              // タグの関連性スコアを見つける
+        <div className="space-y-4">
+          {tagAnalysis.clusters.map((cluster, index) => {
+            // クラスター内のタグの関連性スコアを取得
+            const clusterTags = cluster.tags.map(tagName => {
               const tagInfo = tagAnalysis.tags.find(t => t.name === tagName);
-              return (
-                <span
-                  key={index}
-                  className="px-2 py-1 bg-indigo-100 text-indigo-800 rounded text-sm flex items-center"
-                >
-                  <span>{tagName}</span>
-                  {tagInfo && (
-                    <span className="ml-1 bg-indigo-200 text-indigo-700 text-xs px-1 rounded-full">
-                      {Math.round(tagInfo.relevance * 100)}%
+              return {
+                name: tagName,
+                relevance: tagInfo ? tagInfo.relevance : 0
+              };
+            }).sort((a, b) => b.relevance - a.relevance);
+
+            return (
+              <div key={index} className="bg-gray-50 p-4 rounded-lg">
+                <h4 className="font-medium text-gray-700 mb-2">{cluster.name}</h4>
+                <div className="flex flex-wrap gap-2">
+                  {clusterTags.map((tag, tagIndex) => (
+                    <span
+                      key={tagIndex}
+                      className="px-2 py-1 bg-indigo-100 text-indigo-800 rounded text-sm flex items-center"
+                      style={{
+                        backgroundColor: `rgba(99, 102, 241, ${0.2 + tag.relevance * 0.8})`,
+                      }}
+                    >
+                      <span>{tag.name}</span>
+                      <span className="ml-1 bg-indigo-200 text-indigo-700 text-xs px-1 rounded-full">
+                        {Math.round(tag.relevance * 100)}%
+                      </span>
                     </span>
-                  )}
-                </span>
-              );
-            })}
-          </div>
+                  ))}
+                </div>
+              </div>
+            );
+          })}
         </div>
       </div>
     );
@@ -129,7 +156,7 @@ const TagAnalysis: React.FC<TagAnalysisProps> = ({
 
     const data = topTags.map(tag => ({
       name: tag.name,
-      value: Math.round(tag.relevance * 100)
+      relevance: Math.round(tag.relevance * 100)
     }));
 
     return (
@@ -140,14 +167,13 @@ const TagAnalysis: React.FC<TagAnalysisProps> = ({
             <BarChart
               data={data}
               layout="vertical"
-              margin={{ top: 5, right: 30, left: 80, bottom: 5 }}
+              margin={{ top: 5, right: 30, left: 100, bottom: 5 }}
             >
               <CartesianGrid strokeDasharray="3 3" />
               <XAxis type="number" domain={[0, 100]} />
-              <YAxis dataKey="name" type="category" width={80} />
+              <YAxis type="category" dataKey="name" />
               <Tooltip formatter={(value) => [`${value}%`, '関連性']} />
-              <Legend />
-              <Bar dataKey="value" name="関連性" fill="#8884d8" />
+              <Bar dataKey="relevance" fill="#8884d8" />
             </BarChart>
           </ResponsiveContainer>
         </div>
@@ -199,6 +225,70 @@ const TagAnalysis: React.FC<TagAnalysisProps> = ({
     );
   };
 
+  // タグの関連度グラフ表示
+  const renderTagRelevance = () => {
+    if (!tagAnalysis || !tagAnalysis.tags || tagAnalysis.tags.length === 0) {
+      return <p>タグデータがありません</p>;
+    }
+
+    const sortedTags = [...tagAnalysis.tags]
+      .sort((a, b) => b.relevance - a.relevance)
+      .slice(0, 10);
+
+    return (
+      <div className="mb-8">
+        <h3 className="text-lg font-semibold mb-2">タグの関連度</h3>
+        <div className="h-72">
+          <ResponsiveContainer width="100%" height="100%">
+            <BarChart
+              data={sortedTags}
+              layout="vertical"
+              margin={{ top: 5, right: 30, left: 80, bottom: 5 }}
+            >
+              <CartesianGrid strokeDasharray="3 3" />
+              <XAxis type="number" domain={[0, 1]} />
+              <YAxis 
+                type="category" 
+                dataKey="name" 
+                width={80} 
+                tick={{ fontSize: 12 }} 
+              />
+              <Tooltip 
+                formatter={(value) => [`${(Number(value) * 100).toFixed(1)}%`, '関連度']}
+                labelFormatter={(label) => `タグ: ${label}`}
+              />
+              <Bar 
+                dataKey="relevance" 
+                fill="#8884d8"
+                onClick={(data) => toggleTagSelection(data)}
+              >
+                {sortedTags.map((entry, index) => (
+                  <Cell 
+                    key={`cell-${index}`} 
+                    fill={isTagSelected(entry.name) ? '#FF8042' : COLORS[index % COLORS.length]} 
+                    cursor="pointer"
+                  />
+                ))}
+              </Bar>
+            </BarChart>
+          </ResponsiveContainer>
+        </div>
+        <div className="mt-4">
+          <p className="text-sm text-gray-600 mb-2">
+            選択されたタグ: {selectedTags.map(tag => tag.name).join(', ') || 'なし'}
+          </p>
+          <button
+            onClick={applySelectedTags}
+            disabled={selectedTags.length === 0}
+            className="px-4 py-2 bg-indigo-600 text-white rounded-md hover:bg-indigo-700 disabled:opacity-50 disabled:cursor-not-allowed"
+          >
+            選択したタグを適用
+          </button>
+        </div>
+      </div>
+    );
+  };
+
   if (loading) {
     return (
       <div className="p-4">
@@ -238,64 +328,124 @@ const TagAnalysis: React.FC<TagAnalysisProps> = ({
     <div className="p-4">
       <h2 className="text-xl font-bold mb-4">タグ分析</h2>
       
-      {/* タグ一覧 */}
-      <div className="mb-8">
-        <h3 className="text-lg font-semibold mb-2">生成されたタグ</h3>
-        <div className="bg-gray-50 p-4 rounded-lg">
-          <div className="flex flex-wrap gap-2">
-            {tagAnalysis?.tags.map((tag, index) => (
-              <span
-                key={index}
-                className="px-2 py-1 bg-indigo-100 text-indigo-800 rounded text-sm flex items-center"
-              >
-                <span>{tag.name}</span>
-                <span className="ml-1 bg-indigo-200 text-indigo-700 text-xs px-1 rounded-full">
-                  {Math.round(tag.relevance * 100)}%
-                </span>
-              </span>
-            ))}
-          </div>
-        </div>
+      {/* タブナビゲーション */}
+      <div className="mb-6 border-b">
+        <nav className="flex space-x-4">
+          <button
+            onClick={() => setActiveTab('overview')}
+            className={`py-2 px-3 text-sm font-medium ${
+              activeTab === 'overview'
+                ? 'border-b-2 border-indigo-500 text-indigo-600'
+                : 'text-gray-500 hover:text-gray-700'
+            }`}
+          >
+            概要
+          </button>
+          <button
+            onClick={() => setActiveTab('clusters')}
+            className={`py-2 px-3 text-sm font-medium ${
+              activeTab === 'clusters'
+                ? 'border-b-2 border-indigo-500 text-indigo-600'
+                : 'text-gray-500 hover:text-gray-700'
+            }`}
+          >
+            クラスター分析
+          </button>
+          <button
+            onClick={() => setActiveTab('timeline')}
+            className={`py-2 px-3 text-sm font-medium ${
+              activeTab === 'timeline'
+                ? 'border-b-2 border-indigo-500 text-indigo-600'
+                : 'text-gray-500 hover:text-gray-700'
+            }`}
+          >
+            時系列分析
+          </button>
+        </nav>
       </div>
       
-      {/* タグクラスター */}
-      {renderTagClusters()}
-      
-      {/* タグ関連性チャート */}
-      {renderTagRelevanceChart()}
-      
-      {/* タグ分布チャート */}
-      {renderTagDistributionChart()}
-      
-      {/* タイムライン分析 */}
-      {timeline.length > 0 && (
-        <div className="mb-8">
-          <h3 className="text-lg font-semibold mb-2">タグ傾向の時系列分析</h3>
-          <div className="bg-gray-50 p-4 rounded-lg" style={{ height: 300 }}>
-            <ResponsiveContainer width="100%" height="100%">
-              <BarChart
-                data={timeline}
-                margin={{ top: 20, right: 30, left: 20, bottom: 5 }}
-              >
-                <CartesianGrid strokeDasharray="3 3" />
-                <XAxis dataKey="period" />
-                <YAxis />
-                <Tooltip />
-                <Legend />
-                {timeline[0]?.tags.slice(0, 5).map((tag, index) => (
-                  <Bar 
-                    key={index} 
-                    dataKey={`tags[${index}].count`} 
-                    name={tag.name} 
-                    stackId="a" 
-                    fill={COLORS[index % COLORS.length]} 
-                  />
+      {/* 概要タブ */}
+      {activeTab === 'overview' && (
+        <>
+          {/* タグ一覧 */}
+          <div className="mb-8">
+            <h3 className="text-lg font-semibold mb-2">生成されたタグ</h3>
+            <div className="bg-gray-50 p-4 rounded-lg">
+              <div className="flex flex-wrap gap-2">
+                {tagAnalysis?.tags.map((tag, index) => (
+                  <span
+                    key={index}
+                    className="px-2 py-1 bg-indigo-100 text-indigo-800 rounded text-sm flex items-center"
+                    style={{
+                      backgroundColor: `rgba(99, 102, 241, ${0.2 + tag.relevance * 0.8})`,
+                    }}
+                  >
+                    <span>{tag.name}</span>
+                    <span className="ml-1 bg-indigo-200 text-indigo-700 text-xs px-1 rounded-full">
+                      {Math.round(tag.relevance * 100)}%
+                    </span>
+                  </span>
                 ))}
-              </BarChart>
-            </ResponsiveContainer>
+              </div>
+            </div>
           </div>
-        </div>
+          
+          {/* タグ関連性チャート */}
+          {renderTagRelevanceChart()}
+          
+          {/* タグ分布チャート */}
+          {renderTagDistributionChart()}
+        </>
       )}
+      
+      {/* クラスター分析タブ */}
+      {activeTab === 'clusters' && (
+        <>
+          {/* タグクラスター */}
+          {renderTagClusters()}
+          
+          {/* インタラクティブなタグマップ */}
+          {tagAnalysis && tagAnalysis.tags.length > 0 && tagAnalysis.clusters.length > 0 && (
+            <div className="mb-8">
+              <h3 className="text-lg font-semibold mb-2">インタラクティブタグマップ</h3>
+              <p className="text-sm text-gray-600 mb-4">
+                タグ間の関連性を視覚的に表現しています。同じクラスターに属するタグは同じ色で表示され、
+                タグの大きさはその関連性の強さを表しています。マウスでドラッグして動かしたり、
+                ホイールでズームイン/アウトできます。
+              </p>
+              <TagForceGraph 
+                tags={tagAnalysis.tags} 
+                clusters={tagAnalysis.clusters} 
+              />
+            </div>
+          )}
+        </>
+      )}
+      
+      {/* 時系列分析タブ */}
+      {activeTab === 'timeline' && (
+        <>
+          {/* タイムライン分析 */}
+          {timeline.length > 0 ? (
+            <TagTimelineChart timelineData={timeline} />
+          ) : (
+            <div className="bg-yellow-50 border border-yellow-200 text-yellow-800 rounded-md p-4">
+              <div className="flex items-center">
+                <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5 mr-2" viewBox="0 0 20 20" fill="currentColor">
+                  <path fillRule="evenodd" d="M18 10a8 8 0 11-16 0 8 8 0 0116 0zm-7-4a1 1 0 11-2 0 1 1 0 012 0zM9 9a1 1 0 000 2v3a1 1 0 001 1h1a1 1 0 100-2h-1V9a1 1 0 00-1-1H9z" clipRule="evenodd" />
+                </svg>
+                <span className="font-medium">情報</span>
+              </div>
+              <p className="mt-1 ml-7">
+                タイムラインデータがありません。複数の作品を登録すると、時間の経過に伴うタグの傾向変化を分析できます。
+              </p>
+            </div>
+          )}
+        </>
+      )}
+      
+      {/* タグの関連度グラフ */}
+      {renderTagRelevance()}
     </div>
   );
 };

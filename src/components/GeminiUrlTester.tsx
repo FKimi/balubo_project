@@ -164,4 +164,4 @@ const GeminiUrlTester: React.FC = () => {
   );
 };
 
-export default GeminiUrlTester;
+export { GeminiUrlTester };

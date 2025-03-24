@@ -1,9 +1,11 @@
 import React, { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { supabase } from '../lib/supabase';
-import { ArrowLeft, FileText, Image, Link, Upload, X } from 'lucide-react';
+import { ArrowLeft, FileText, Image, Link, Upload, X, Tag as TagIcon } from 'lucide-react';
 import UrlAnalyzer from './UrlAnalyzer';
 import { UrlAnalysisResult } from '../lib/url-analyzer';
+import TagAnalysis from './TagAnalysis';
+import { analyzeUserData } from '../lib/ai-analysis';
 
 export function WorkCreate() {
   const navigate = useNavigate();
@@ -13,6 +15,7 @@ export function WorkCreate() {
   const [selectedType, setSelectedType] = useState<'writing' | 'design'>('writing');
   const [userId, setUserId] = useState<string | null>(null);
   const [showUrlAnalyzer, setShowUrlAnalyzer] = useState(false);
+  const [showTagAnalysis, setShowTagAnalysis] = useState(false);
   const [form, setForm] = useState({
     title: '',
     source_url: '',
@@ -29,6 +32,7 @@ export function WorkCreate() {
     image_url: '',
     tags: ''
   });
+  const [tagArray, setTagArray] = useState<string[]>([]);
 
   // ユーザーIDを取得
   useEffect(() => {
@@ -40,6 +44,16 @@ export function WorkCreate() {
     };
     getUser();
   }, []);
+
+  // タグ文字列が変更されたらタグ配列を更新
+  useEffect(() => {
+    if (form.tags) {
+      const tags = form.tags.split(',').map(tag => tag.trim()).filter(tag => tag !== '');
+      setTagArray(tags);
+    } else {
+      setTagArray([]);
+    }
+  }, [form.tags]);
 
   const handleDrag = (e: React.DragEvent) => {
     e.preventDefault();
@@ -89,18 +103,218 @@ export function WorkCreate() {
       const { data: { user } } = await supabase.auth.getUser();
       if (!user) throw new Error('認証が必要です');
 
-      const { error: insertError } = await supabase
+      // 1. まず作品を保存
+      const { data: workData, error: insertError } = await supabase
         .from('works')
         .insert([
           {
             user_id: user.id,
-            ...form
+            title: form.title,
+            description: form.description,
+            source_url: form.source_url,
+            image_url: form.image_url,
+            is_public: form.is_public,
+            work_type: form.work_type,
+            design_type: form.design_type,
+            tools_used: form.tools_used,
+            design_url: form.design_url,
+            behance_url: form.behance_url,
+            dribbble_url: form.dribbble_url
           }
-        ]);
+        ])
+        .select('id')
+        .single();
 
       if (insertError) throw insertError;
 
-      navigate('/dashboard');
+      if (workData && tagArray.length > 0) {
+        // 2. タグを処理
+        for (const tagName of tagArray) {
+          // 2.1 タグが存在するか確認し、なければ作成
+          let tagId;
+          const { data: existingTag } = await supabase
+            .from('tags')
+            .select('id')
+            .eq('name', tagName)
+            .single();
+
+          if (existingTag) {
+            tagId = existingTag.id;
+          } else {
+            const { data: newTag, error: tagError } = await supabase
+              .from('tags')
+              .insert([{ name: tagName }])
+              .select('id')
+              .single();
+
+            if (tagError) {
+              console.error('タグの作成に失敗しました:', tagError);
+              continue;
+            }
+            tagId = newTag.id;
+          }
+
+          // 2.2 作品とタグを関連付け
+          const { error: relationError } = await supabase
+            .from('work_tags')
+            .insert([{ work_id: workData.id, tag_id: tagId }]);
+
+          if (relationError) {
+            console.error('タグの関連付けに失敗しました:', relationError);
+          }
+          
+          // 2.3 ユーザーのタグ統計を更新
+          try {
+            // タグ統計が存在するか確認
+            const { data: existingStat } = await supabase
+              .from('tag_stats')
+              .select('*')
+              .eq('user_id', user.id)
+              .eq('tag_id', tagId)
+              .single();
+            
+            if (existingStat) {
+              // 既存の統計を更新
+              await supabase
+                .from('tag_stats')
+                .update({
+                  count: existingStat.count + 1,
+                  last_used_at: new Date().toISOString()
+                })
+                .eq('id', existingStat.id);
+            } else {
+              // 新しい統計を作成
+              await supabase
+                .from('tag_stats')
+                .insert([{
+                  user_id: user.id,
+                  tag_id: tagId,
+                  tag_name: tagName,
+                  count: 1,
+                  first_used_at: new Date().toISOString(),
+                  last_used_at: new Date().toISOString()
+                }]);
+            }
+          } catch (statError) {
+            console.error('タグ統計の更新に失敗しました:', statError);
+          }
+        }
+        
+        // 3. AI分析を実行し、結果をuser_insightsテーブルに保存
+        try {
+          // ユーザーの全作品を取得
+          const { data: userWorks, error: worksError } = await supabase
+            .from('works')
+            .select('*')
+            .eq('user_id', user.id);
+            
+          if (worksError) throw worksError;
+          
+          if (userWorks && userWorks.length > 0) {
+            // 各作品のタグを取得
+            const worksWithTags = await Promise.all(
+              userWorks.map(async (work) => {
+                try {
+                  // work_tags_with_namesビューを使用してタグを取得
+                  const { data: tagsData, error: tagsError } = await supabase
+                    .from('work_tags_with_names')
+                    .select('*')
+                    .eq('work_id', work.id);
+                    
+                  if (tagsError) throw tagsError;
+                  
+                  // タグ名を抽出
+                  const tags = tagsData 
+                    ? tagsData.map(item => item.tag_name).filter(Boolean)
+                    : [];
+                    
+                  return {
+                    ...work,
+                    tags
+                  };
+                } catch (error) {
+                  console.error(`Error fetching tags for work ${work.id}:`, error);
+                  return {
+                    ...work,
+                    tags: []
+                  };
+                }
+              })
+            );
+            
+            // AI分析を実行
+            const analysisResult = await analyzeUserData(worksWithTags);
+            
+            // 既存のuser_insightsレコードを確認
+            const { data: existingInsight } = await supabase
+              .from('user_insights')
+              .select('id')
+              .eq('user_id', user.id)
+              .single();
+              
+            if (existingInsight) {
+              // 既存のレコードを更新
+              await supabase
+                .from('user_insights')
+                .update({
+                  expertise: analysisResult.expertise,
+                  uniqueness: analysisResult.uniqueness,
+                  interests: analysisResult.interests,
+                  talent: analysisResult.talent,
+                  specialties: analysisResult.specialties,
+                  design_styles: analysisResult.designStyles,
+                  updated_at: new Date().toISOString()
+                })
+                .eq('id', existingInsight.id);
+            } else {
+              // 新しいレコードを作成
+              await supabase
+                .from('user_insights')
+                .insert([{
+                  user_id: user.id,
+                  expertise: analysisResult.expertise,
+                  uniqueness: analysisResult.uniqueness,
+                  interests: analysisResult.interests,
+                  talent: analysisResult.talent,
+                  specialties: analysisResult.specialties,
+                  design_styles: analysisResult.designStyles
+                }]);
+            }
+          }
+        } catch (analysisError) {
+          console.error('AI分析の実行または保存に失敗しました:', analysisError);
+          // 分析エラーは致命的ではないので、作品保存は続行
+        }
+      }
+
+      // 4. ファイルがある場合はアップロード
+      if (form.file) {
+        const fileExt = form.file.name.split('.').pop();
+        const fileName = `${workData.id}.${fileExt}`;
+        const filePath = `works/${user.id}/${fileName}`;
+
+        const { error: uploadError } = await supabase.storage
+          .from('works')
+          .upload(filePath, form.file);
+
+        if (uploadError) {
+          console.error('ファイルのアップロードに失敗しました:', uploadError);
+        } else {
+          // アップロードに成功したら、作品のサムネイルURLを更新
+          const { data: publicUrl } = supabase.storage
+            .from('works')
+            .getPublicUrl(filePath);
+
+          if (publicUrl) {
+            await supabase
+              .from('works')
+              .update({ thumbnail_url: publicUrl.publicUrl })
+              .eq('id', workData.id);
+          }
+        }
+      }
+
+      navigate('/mypage');
     } catch (err) {
       setError(err instanceof Error ? err.message : '作品の登録中にエラーが発生しました');
     } finally {
@@ -144,12 +358,55 @@ export function WorkCreate() {
     setShowUrlAnalyzer(false);
   };
 
+  // タグ分析結果を受け取る処理
+  const handleTagAnalysisComplete = (tags: Array<{name: string; relevance: number}>) => {
+    if (tags && tags.length > 0) {
+      const tagString = tags
+        .sort((a, b) => b.relevance - a.relevance)
+        .slice(0, 5)
+        .map(tag => tag.name)
+        .join(', ');
+      
+      setForm(prev => ({
+        ...prev,
+        tags: tagString
+      }));
+    }
+    
+    setShowTagAnalysis(false);
+  };
+
+  // タグを削除する処理
+  const removeTag = (tagToRemove: string) => {
+    const updatedTags = tagArray.filter(tag => tag !== tagToRemove);
+    setForm(prev => ({
+      ...prev,
+      tags: updatedTags.join(', ')
+    }));
+  };
+
+  // タグを追加する処理
+  const addTag = (e: React.KeyboardEvent<HTMLInputElement>) => {
+    if (e.key === 'Enter' && e.currentTarget.value) {
+      e.preventDefault();
+      const newTag = e.currentTarget.value.trim();
+      if (newTag && !tagArray.includes(newTag)) {
+        const updatedTags = [...tagArray, newTag];
+        setForm(prev => ({
+          ...prev,
+          tags: updatedTags.join(', ')
+        }));
+        e.currentTarget.value = '';
+      }
+    }
+  };
+
   return (
     <div className="min-h-screen bg-gray-50">
       <div className="max-w-3xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
         <div className="flex items-center justify-between mb-8">
           <button
-            onClick={() => navigate('/dashboard')}
+            onClick={() => navigate('/mypage')}
             className="flex items-center text-sm text-gray-500 hover:text-gray-700"
           >
             <ArrowLeft className="w-4 h-4 mr-1" />
@@ -413,6 +670,77 @@ export function WorkCreate() {
                   </div>
                 </>
               )}
+
+              <div>
+                <label htmlFor="tags" className="block text-sm font-medium text-gray-700 mb-1">
+                  タグ
+                </label>
+                <div className="mb-2">
+                  <div className="flex flex-wrap gap-2 mb-2">
+                    {tagArray.map((tag, index) => (
+                      <div 
+                        key={index} 
+                        className="inline-flex items-center bg-indigo-100 text-indigo-800 text-xs rounded px-2 py-1"
+                      >
+                        <span>{tag}</span>
+                        <button 
+                          type="button" 
+                          onClick={() => removeTag(tag)}
+                          className="ml-1 text-indigo-500 hover:text-indigo-700"
+                        >
+                          <X className="h-3 w-3" />
+                        </button>
+                      </div>
+                    ))}
+                  </div>
+                  <div className="relative rounded-md shadow-sm">
+                    <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
+                      <TagIcon className="h-5 w-5 text-gray-400" />
+                    </div>
+                    <input
+                      type="text"
+                      id="tag-input"
+                      placeholder="タグを入力してEnterキーを押してください"
+                      className="block w-full pl-10 rounded-md border-gray-300 focus:border-indigo-500 focus:ring-indigo-500"
+                      onKeyDown={addTag}
+                    />
+                  </div>
+                  <p className="mt-2 text-sm text-gray-500">
+                    カンマ区切りでタグを入力するか、1つずつ入力してEnterキーを押してください
+                  </p>
+                  <div className="mt-2 flex justify-between">
+                    <button
+                      type="button"
+                      onClick={() => setShowTagAnalysis(!showTagAnalysis)}
+                      className="text-indigo-600 hover:text-indigo-800 text-sm font-medium"
+                    >
+                      {showTagAnalysis ? 'タグ分析を閉じる' : 'AIでタグを自動生成'}
+                    </button>
+                  </div>
+                </div>
+                
+                {showTagAnalysis && userId && (
+                  <div className="mt-4 p-4 border border-gray-200 rounded-lg bg-white">
+                    <TagAnalysis 
+                      userId={userId}
+                      title={form.title}
+                      description={form.description}
+                      url={form.source_url}
+                      content=""
+                      onTagSelect={handleTagAnalysisComplete}
+                    />
+                    <div className="mt-4 flex justify-end">
+                      <button
+                        type="button"
+                        onClick={() => setShowTagAnalysis(false)}
+                        className="px-4 py-2 text-sm font-medium text-gray-700 bg-white border border-gray-300 rounded-md hover:bg-gray-50"
+                      >
+                        閉じる
+                      </button>
+                    </div>
+                  </div>
+                )}
+              </div>
 
               <div className="pt-4 border-t border-gray-200">
                 <div className="flex items-center">

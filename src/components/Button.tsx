@@ -1,18 +1,20 @@
 import { forwardRef } from 'react';
+import type { ForwardedRef } from 'react';
 
 interface ButtonProps extends React.ButtonHTMLAttributes<HTMLButtonElement> {
-  variant?: 'primary' | 'secondary' | 'text';
+  variant?: 'primary' | 'secondary' | 'text' | 'destructive';
   size?: 'sm' | 'md' | 'lg';
 }
 
 export const Button = forwardRef<HTMLButtonElement, ButtonProps>(
-  ({ className = '', variant = 'primary', size = 'md', ...props }, ref) => {
+  ({ className = '', variant = 'primary', size = 'md', ...props }, ref: ForwardedRef<HTMLButtonElement>) => {
     const baseStyles = 'inline-flex items-center justify-center font-medium rounded-md transition-colors';
     
     const variants = {
       primary: 'bg-indigo-600 text-white hover:bg-indigo-700 focus:ring-2 focus:ring-offset-2 focus:ring-indigo-500',
       secondary: 'bg-white text-gray-700 border border-gray-300 hover:bg-gray-50',
-      text: 'bg-transparent hover:bg-gray-100'
+      text: 'bg-transparent hover:bg-gray-100',
+      destructive: 'bg-red-600 text-white hover:bg-red-700 focus:ring-2 focus:ring-offset-2 focus:ring-red-500'
     };
     
     const sizes = {

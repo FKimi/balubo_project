@@ -1,0 +1,1090 @@
+import React, { useState, useEffect, useCallback } from 'react';
+import { useNavigate } from 'react-router-dom';
+import { supabase } from '../lib/supabase';
+import { useToast } from '../lib/hooks/useToast';
+import { Button } from '../components/Button';
+import { Badge } from '../components/Badge';
+import { 
+  Edit,
+  PlusCircle,
+  Loader2,
+  Zap,
+  Award,
+  FileText,
+  BookOpen,
+  Fingerprint,
+  Compass
+} from 'lucide-react';
+import { analyzeUserData } from '../lib/ai-analysis';
+
+// 作品データの型定義
+interface Work {
+  id: string;
+  title: string;
+  description?: string;
+  image_url?: string;
+  thumbnail_url?: string;
+  created_at: string;
+  updated_at?: string;
+  user_id: string;
+  views?: number;
+  comment_count?: number;
+  tags?: string[];
+}
+
+// 職歴データの型定義
+interface Career {
+  id: string;
+  company: string;
+  position: string;
+  department?: string;
+  startDate: string;
+  endDate?: string;
+  isCurrentPosition: boolean;
+}
+
+// ユーザープロファイル情報の型定義
+interface UserProfile {
+  id: string;
+  name: string;
+  bio: string;
+  website_url: string;
+  profile_image_url: string;
+  background_image_url: string;
+  twitter_username: string;
+  instagram_username: string;
+  facebook_username: string;
+}
+
+// AI分析結果の型定義
+interface DisplayAIAnalysisResult {
+  talent?: {
+    summary?: string;
+    areas?: string[];
+    level?: number;
+  };
+  uniqueness?: {
+    summary?: string;
+    differentiators?: string[];
+    level?: number;
+  };
+  interests?: {
+    summary?: string;
+    areas?: string[];
+    level?: number;
+  };
+  expertise?: string;
+  contentStyle?: string;
+  specialties?: Array<string>;
+  designStyles?: Array<string>;
+}
+
+const Mypage = () => {
+  const navigate = useNavigate();
+  const { toast } = useToast();
+  
+  // 状態管理
+  const [works, setWorks] = useState<Work[]>([]);
+  const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
+  const [displayAiResult, setDisplayAiResult] = useState<DisplayAIAnalysisResult>({});
+  const [isAnalyzing, setIsAnalyzing] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+  // ユーザープロファイル情報を管理するstate
+  const [userProfile, setUserProfile] = useState<UserProfile | null>(null);
+  const [careers, setCareers] = useState<Career[]>([
+    {
+      id: '1',
+      company: '日経BP',
+      position: '編集者',
+      department: '編集部',
+      startDate: '2020年4月',
+      isCurrentPosition: true
+    },
+    {
+      id: '2',
+      company: 'デジタルメディア株式会社',
+      position: 'ライター',
+      department: 'コンテンツ制作部',
+      startDate: '2018年4月',
+      endDate: '2020年3月',
+      isCurrentPosition: false
+    }
+  ]);
+  const [editingCareer, setEditingCareer] = useState<Career | null>(null);
+  const [showCareerDialog, setShowCareerDialog] = useState(false);
+  const [companyName, setCompanyName] = useState('');
+  const [position, setPosition] = useState('');
+  const [department, setDepartment] = useState('');
+  const [startDate, setStartDate] = useState('');
+  const [endDate, setEndDate] = useState('');
+  const [isCurrentJob, setIsCurrentJob] = useState(false);
+
+  // 画像サイズの検証関数
+  const isValidImageSize = (imageData: string): boolean => {
+    // Base64データの場合
+    if (imageData.startsWith('data:')) {
+      // Base64データのサイズを概算（Base64エンコードは元のデータの約4/3倍のサイズ）
+      const base64Length = imageData.length - (imageData.indexOf(',') + 1);
+      const approximateSize = (base64Length * 3) / 4;
+      
+      // 2MBを超える場合は無効と判断
+      if (approximateSize > 2 * 1024 * 1024) {
+        console.warn('画像サイズが大きすぎます（約' + Math.round(approximateSize / 1024 / 1024) + 'MB）');
+        return false;
+      }
+    }
+    
+    return true; // URLの場合は検証をスキップ
+  };
+
+  // プロフィール画像のサイズをチェックする関数
+  const validateProfileImage = useCallback(() => {
+    if (userProfile?.profile_image_url && !isValidImageSize(userProfile.profile_image_url)) {
+      console.warn('プロフィール画像が大きすぎます。デフォルト画像を使用します。');
+      // 大きすぎる画像の場合、デフォルト画像を使用
+      return "https://randomuser.me/api/portraits/men/32.jpg";
+    }
+    return userProfile?.profile_image_url || '';
+  }, [userProfile]);
+
+  // ユーザープロファイル情報を取得する関数
+  const fetchUserProfile = useCallback(async () => {
+    try {
+      // オフライン時はローカルデータを使用
+      const { data: sessionData } = await supabase.auth.getSession();
+      if (!sessionData.session) {
+        const cachedProfile = localStorage.getItem('userProfile');
+        if (cachedProfile) {
+          setUserProfile(JSON.parse(cachedProfile));
+          return;
+        }
+      }
+
+      const { data: { user } } = await supabase.auth.getUser();
+      
+      if (!user) {
+        toast.error({ title: 'ユーザー情報の取得に失敗しました。再度ログインしてください。' });
+        return;
+      }
+      
+      const { data, error } = await supabase
+        .from('profiles')
+        .select('*')
+        .eq('id', user.id)
+        .single();
+      
+      if (error) {
+        // PGRST116エラー（レコードが存在しない）の場合、プロフィールを作成
+        if (error.code === 'PGRST116') {
+          const newProfile = {
+            id: user.id,
+            name: user.email?.split('@')[0] || 'ユーザー',
+            bio: '',
+            website_url: '',
+            twitter_username: '',
+            instagram_username: '',
+            facebook_username: '',
+            profile_image_url: '',
+            background_image_url: ''
+          };
+          
+          const { error: insertError } = await supabase
+            .from('profiles')
+            .insert([newProfile]);
+          
+          if (insertError) {
+            console.error('プロフィール作成エラー:', insertError);
+            toast.error({ title: 'プロフィール情報の作成に失敗しました。' });
+            return;
+          }
+          
+          setUserProfile(newProfile);
+          // キャッシュにも保存
+          localStorage.setItem('userProfile', JSON.stringify(newProfile));
+          return;
+        }
+        
+        console.error('プロフィール取得エラー:', error);
+        toast.error({ title: 'プロフィール情報の取得に失敗しました。' });
+        return;
+      }
+      
+      setUserProfile(data);
+      // キャッシュにも保存
+      localStorage.setItem('userProfile', JSON.stringify(data));
+    } catch (error) {
+      console.error('プロフィール取得中にエラーが発生しました:', error);
+      toast.error({ title: 'プロフィール情報の取得に失敗しました。' });
+    }
+  }, [toast]); // toastのみを依存配列に追加
+
+  // 作品データの取得
+  const fetchWorks = useCallback(async (userId?: string) => {
+    try {
+      // ユーザーIDが指定されていない場合は現在のユーザーIDを取得
+      if (!userId) {
+        const { data: { user } } = await supabase.auth.getUser();
+        if (!user) {
+          console.log('ユーザーが見つかりません。作品データを取得できません。');
+          setWorks([]);
+          return;
+        }
+        userId = user.id;
+      }
+
+      // 作品データを取得
+      const { data: worksData, error: worksError } = await supabase
+        .from('works')
+        .select('*')
+        .eq('user_id', userId);
+
+      if (worksError) {
+        console.error("Error fetching works:", worksError);
+        toast.error({ title: '作品データの取得中にエラーが発生しました。' });
+        setWorks([]);
+        return;
+      }
+
+      if (!worksData || worksData.length === 0) {
+        setWorks([]);
+        return;
+      }
+
+      // 各作品のタグを取得するには、work_tagsテーブルとtagsテーブルを結合する必要がある
+      const worksWithTags = await Promise.all(
+        worksData.map(async (work) => {
+          try {
+            // タグ情報を取得するには、work_tagsテーブルとtagsテーブルを結合する必要がある
+            const { data: tagsData, error: tagsError } = await supabase
+              .from('work_tags')
+              .select('tag_id, tags(id, name)')
+              .eq('work_id', work.id);
+
+            if (tagsError) {
+              console.error(`Error fetching tags for work ${work.id}:`, tagsError);
+              return { 
+                ...work, 
+                tags: [], 
+                views: Math.floor(Math.random() * 1000) 
+              };
+            }
+
+            // タグデータを抽出
+            const tags: string[] = [];
+            
+            if (tagsData) {
+              for (const item of tagsData) {
+                // tagsプロパティがオブジェクトの場合の処理
+                if (item.tags && typeof item.tags === 'object' && 'name' in item.tags) {
+                  const tagName = item.tags.name;
+                  if (typeof tagName === 'string') {
+                    tags.push(tagName);
+                  }
+                }
+              }
+            }
+
+            return {
+              ...work,
+              tags,
+              views: Math.floor(Math.random() * 1000)   
+            };
+          } catch (error) {
+            console.error(`Error processing tags for work ${work.id}:`, error);
+            return { 
+              ...work, 
+              tags: [], 
+              views: Math.floor(Math.random() * 1000) 
+            };
+          }
+        })
+      );
+
+      setWorks(worksWithTags);
+    } catch (error) {
+      console.error("Error in fetchWorks:", error);
+      toast.error({ title: '作品データの取得中にエラーが発生しました。' });
+      setWorks([]);
+    }
+  }, [toast]);
+
+  // AI分析の実行
+  const runAIAnalysis = async () => {
+    if (isAnalyzing || works.length === 0) {
+      toast.error({ title: '作品がありません。AI分析を実行するには、まず作品を追加してください。' });
+      return;
+    }
+    
+    setIsAnalyzing(true);
+    try {
+      // 作品データを分析APIに渡す
+      // Workインターフェースの違いを解消するためにマッピング
+      const worksForAnalysis = works.map(work => ({
+        ...work,
+        // 必要なプロパティを確保
+        description: work.description || '',
+        updated_at: work.updated_at || work.created_at,
+      }));
+      
+      const result = await analyzeUserData(worksForAnalysis);
+      
+      // 分析結果を拡張して表示用のプロパティを追加
+      setDisplayAiResult({
+        ...result,
+        expertise: `あなたは${result.specialties?.[0] || "コンテンツ制作"}に関する知識が豊富で、${result.specialties?.[1] || ""}と${result.specialties?.[2] || ""}を組み合わせた独自の視点を持っています。`,
+        contentStyle: `${result.designStyles?.[0] || "モダン"}で${result.designStyles?.[1] || "ユーザー中心"}なアプローチが特徴です。読者の理解を助けるために、具体例と明確な説明を組み合わせています。`
+      });
+      
+      toast({ title: 'AI分析が完了しました', description: 'あなたの作品から特徴を分析しました' });
+    } catch (error) {
+      console.error("AI分析中にエラーが発生しました:", error);
+      toast.error({ title: 'AI分析中にエラーが発生しました。' });
+    } finally {
+      setIsAnalyzing(false);
+    }
+  };
+
+  // ユーザーデータの初期ロード
+  useEffect(() => {
+    const loadUserData = async () => {
+      try {
+        // ユーザー情報を取得
+        const { data: { user } } = await supabase.auth.getUser();
+        
+        if (!user) {
+          console.log('ユーザーが見つかりません。ログインページにリダイレクトします。');
+          navigate('/login');
+          return;
+        }
+        
+        // ユーザープロファイルを取得
+        await fetchUserProfile();
+        
+        // 作品を取得
+        await fetchWorks(user.id);
+        
+      } catch (error) {
+        console.error('Error loading user data:', error);
+        toast.error({ title: 'データ読み込みエラー', description: 'ユーザーデータの読み込みに失敗しました。' });
+      }
+    };
+
+    loadUserData();
+  }, [fetchWorks, navigate, toast, fetchUserProfile]);
+
+  useEffect(() => {
+    fetchUserProfile();
+    fetchWorks();
+  }, [fetchUserProfile, fetchWorks]);
+
+  useEffect(() => {
+    if (userProfile) {
+      // プロフィール画像のサイズを検証
+      validateProfileImage();
+    }
+  }, [userProfile, validateProfileImage, fetchUserProfile]);
+
+  // モバイルメニューの切り替え
+  const toggleMobileMenu = () => {
+    setIsMobileMenuOpen(!isMobileMenuOpen);
+  };
+
+  // キャリア編集ダイアログを開く関数
+  const openCareerEditDialog = (career?: Career) => {
+    if (career) {
+      setEditingCareer(career);
+      setCompanyName(career.company);
+      setPosition(career.position);
+      setDepartment(career.department || '');
+      setStartDate(career.startDate);
+      setIsCurrentJob(career.isCurrentPosition);
+      if (!career.isCurrentPosition && career.endDate) {
+        setEndDate(career.endDate);
+      } else {
+        setEndDate('');
+      }
+    } else {
+      setEditingCareer(null);
+      setCompanyName('');
+      setPosition('');
+      setDepartment('');
+      setStartDate('');
+      setEndDate('');
+      setIsCurrentJob(false);
+    }
+    setShowCareerDialog(true);
+  };
+
+  // キャリア情報を保存する関数
+  const saveCareer = () => {
+    const newCareer: Career = {
+      id: editingCareer?.id || Date.now().toString(),
+      company: companyName,
+      position,
+      department: department || undefined,
+      startDate,
+      endDate: isCurrentJob ? undefined : endDate || undefined,
+      isCurrentPosition: isCurrentJob
+    };
+
+    if (editingCareer) {
+      // 既存のキャリアを更新
+      const updatedCareers = careers.map(c => 
+        c.id === editingCareer.id ? newCareer : c
+      );
+      setCareers(updatedCareers);
+    } else {
+      // 新しいキャリアを追加
+      setCareers([...careers, newCareer]);
+    }
+
+    setShowCareerDialog(false);
+  };
+
+  // フォーム入力ハンドラ
+  const handleCompanyNameChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    setCompanyName(e.target.value);
+  };
+
+  const handlePositionChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    setPosition(e.target.value);
+  };
+
+  const handleDepartmentChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    setDepartment(e.target.value);
+  };
+
+  const handleStartDateChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    setStartDate(e.target.value);
+  };
+
+  const handleEndDateChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    setEndDate(e.target.value);
+  };
+
+  const handleIsCurrentJobChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    setIsCurrentJob(e.target.checked);
+  };
+
+  return (
+    <div className="min-h-screen bg-gray-50">
+      {/* エラーメッセージ表示 */}
+      {error && (
+        <div className="bg-red-100 border-l-4 border-red-500 text-red-700 p-4 mb-4" role="alert">
+          <p className="font-bold">エラー</p>
+          <p>{error}</p>
+          <button 
+            onClick={() => setError(null)} 
+            className="mt-2 text-sm text-red-700 hover:text-red-900"
+          >
+            閉じる
+          </button>
+        </div>
+      )}
+      
+      {/* ヘッダー */}
+      <header className="bg-white shadow-sm">
+        <div className="max-w-7xl mx-auto">
+          <div className="flex justify-between h-16 items-center">
+            <div className="flex">
+              <div className="flex-shrink-0 flex items-center">
+                <a href="/" className="text-xl font-bold text-indigo-600">Balubo</a>
+              </div>
+            </div>
+            <div className="flex items-center">
+              <button
+                onClick={toggleMobileMenu}
+                className="inline-flex items-center justify-center p-2 rounded-md text-gray-500 hover:text-gray-700 hover:bg-gray-100 focus:outline-none focus:ring-2 focus:ring-inset focus:ring-indigo-500 md:hidden"
+              >
+                <span className="sr-only">メニューを開く</span>
+                <svg
+                  className="h-6 w-6"
+                  xmlns="http://www.w3.org/2000/svg"
+                  fill="none"
+                  viewBox="0 0 24 24"
+                  stroke="currentColor"
+                  aria-hidden="true"
+                >
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 6h16M4 12h16M4 18h16" />
+                </svg>
+              </button>
+              <div className="hidden md:ml-4 md:flex md:items-center md:space-x-4">
+                <a 
+                  href="/works/new"
+                  className="inline-flex items-center px-4 py-2 border border-transparent text-sm font-medium rounded-md shadow-sm text-white bg-indigo-600 hover:bg-indigo-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-indigo-500"
+                >
+                  <PlusCircle className="mr-2 h-4 w-4" />
+                  作品を追加
+                </a>
+                <a 
+                  href="/settings"
+                  className="inline-flex items-center px-3 py-2 text-sm font-medium rounded-md text-gray-700 hover:text-gray-900 hover:bg-gray-100"
+                >
+                  <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" width="24" height="24" fill="currentColor">
+                    <path d="M12 2C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2zm-.35 15.5c-3.51 0-6.35-2.84-6.35-6.35S8.14 4.8 11.65 4.8s6.35 2.84 6.35 6.35-2.84 6.35-6.35 6.35zm0-13c-3.31 0-6 1.79-6 4s1.79 4 4 4 6-1.79 6-4-1.79-4-4-4z" />
+                  </svg>
+                  設定
+                </a>
+              </div>
+            </div>
+          </div>
+        </div>
+      </header>
+
+      {/* モバイルメニュー */}
+      {isMobileMenuOpen && (
+        <div className="md:hidden">
+          <div className="fixed inset-0 flex z-40">
+            <div className="fixed inset-0 bg-gray-600 bg-opacity-75" onClick={toggleMobileMenu}></div>
+            <div className="relative flex-1 flex flex-col max-w-xs w-full bg-white">
+              <div className="absolute top-0 right-0 -mr-12 pt-2">
+                <button
+                  onClick={toggleMobileMenu}
+                  className="ml-1 flex items-center justify-center h-10 w-10 rounded-full focus:outline-none focus:ring-2 focus:ring-inset focus:ring-white"
+                >
+                  <span className="sr-only">メニューを閉じる</span>
+                  <svg
+                    className="h-6 w-6 text-white"
+                    xmlns="http://www.w3.org/2000/svg"
+                    fill="none"
+                    viewBox="0 0 24 24"
+                    stroke="currentColor"
+                    aria-hidden="true"
+                  >
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+                  </svg>
+                </button>
+              </div>
+              <div className="flex-1 h-0 pt-5 pb-4 overflow-y-auto">
+                <div className="flex-shrink-0 flex items-center px-4">
+                  <span className="text-xl font-bold text-indigo-600">Balubo</span>
+                </div>
+                <div className="mt-5 px-2 space-y-1">
+                  <nav className="px-3 mt-6">
+                    <div className="space-y-1">
+                      <a 
+                        href="/works/new"
+                        className="group flex items-center px-3 py-2 text-base font-medium rounded-md text-gray-900 hover:text-indigo-600 hover:bg-indigo-50 w-full text-left"
+                        onClick={toggleMobileMenu}
+                      >
+                        <PlusCircle className="mr-4 h-6 w-6 text-gray-500 group-hover:text-indigo-600" />
+                        作品を追加
+                      </a>
+                      <a 
+                        href="/settings"
+                        className="group flex items-center px-3 py-2 text-base font-medium rounded-md text-gray-900 hover:text-indigo-600 hover:bg-indigo-50 w-full text-left"
+                        onClick={toggleMobileMenu}
+                      >
+                        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" width="24" height="24" fill="currentColor">
+                          <path d="M12 2C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2zm-.35 15.5c-3.51 0-6.35-2.84-6.35-6.35S8.14 4.8 11.65 4.8s6.35 2.84 6.35 6.35-2.84 6.35-6.35 6.35zm0-13c-3.31 0-6 1.79-6 4s1.79 4 4 4 6-1.79 6-4-1.79-4-4-4z" />
+                        </svg>
+                        設定
+                      </a>
+                      <hr className="my-4" />
+                      <button
+                        onClick={async () => {
+                          await supabase.auth.signOut();
+                          navigate('/login');
+                          toggleMobileMenu();
+                        }}
+                        className="group flex items-center px-3 py-2 text-base font-medium rounded-md text-gray-900 hover:text-red-600 hover:bg-red-50 w-full text-left"
+                      >
+                        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" width="24" height="24" fill="currentColor">
+                          <path d="M20 3H4a1 1 0 0 0-1 1v16a1 1 0 0 0 1 1h8v-7h-2v-3h2V8.5C12 7.12 13.12 6 14.5 6H20a1 1 0 0 0 1-1V4a1 1 0 0 0-1-1z" />
+                        </svg>
+                        ログアウト
+                      </button>
+                    </div>
+                  </nav>
+                </div>
+              </div>
+            )}
+
+      {/* プロフィールバナーセクション - 常に表示 */}
+      <div className="w-full bg-white shadow-sm mb-8">
+        <div className="max-w-7xl mx-auto">
+          {/* カバー画像エリア */}
+          <div className="h-48 bg-gradient-to-r from-indigo-500 to-purple-600 relative">
+            {userProfile?.background_image_url ? (
+              <img 
+                className="h-full w-full object-cover"
+                src={userProfile.background_image_url} 
+                alt="背景画像"
+                onError={(e) => {
+                  console.warn('背景画像の読み込みに失敗しました');
+                  // エラー時に背景画像要素を非表示にし、グラデーション背景を表示
+                  (e.target as HTMLImageElement).style.display = 'none';
+                }}
+              />
+            ) : null}
+            <a href="/settings" className="absolute bottom-4 right-4 bg-white p-2 rounded-full shadow-md hover:bg-gray-100">
+              <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" width="24" height="24" fill="currentColor">
+                <path d="M12 2C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2zm-.35 15.5c-3.51 0-6.35-2.84-6.35-6.35S8.14 4.8 11.65 4.8s6.35 2.84 6.35 6.35-2.84 6.35-6.35 6.35zm0-13c-3.31 0-6 1.79-6 4s1.79 4 4 4 6-1.79 6-4-1.79-4-4-4z" />
+              </svg>
+            </a>
+          </div>
+          
+          <div className="px-6 pb-6 relative">
+            {/* プロフィール画像 */}
+            <div className="absolute -top-16 left-6 border-4 border-white rounded-full overflow-hidden shadow-lg"
+                 style={{ width: '8rem', height: '8rem' }}>
+              <img
+                src={validateProfileImage()}
+                alt="プロフィール画像"
+                className="h-full w-full object-cover"
+                onError={(e) => {
+                  console.warn('プロフィール画像の読み込みに失敗しました');
+                  (e.target as HTMLImageElement).src = "https://randomuser.me/api/portraits/men/32.jpg";
+                }}
+              />
+            </div>
+            
+            {/* ユーザー情報 */}
+            <div className="ml-36 pt-2 flex justify-between items-start">
+              <div>
+                <h1 className="text-2xl font-bold text-gray-900">{userProfile?.name || "ユーザー名"}</h1>
+                <p className="text-gray-500 max-w-2xl">{userProfile?.bio || "自己紹介文がありません"}</p>
+                
+                {/* SNSリンク */}
+                <div className="mt-3 flex space-x-3">
+                  {userProfile?.twitter_username && (
+                    <a
+                      href={`https://twitter.com/${userProfile.twitter_username}`}
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      className="text-gray-600 hover:text-blue-400"
+                    >
+                      <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" width="24" height="24" fill="currentColor">
+                        <path d="M20.46 6c-.77.35-1.6.58-2.46.69.88-.53 1.56-1.37 1.88-2.38-.83.5-1.75.85-2.72 1.05C18.37 4.5 17.26 4 16 4c-2.35 0-4.27 1.92-4.27 4.29 0 .34.04.67.11.98C8.28 9.09 5.11 7.38 3 4.79c-.37.63-.58 1.37-.58 2.15 0 1.49.75 2.81 1.91 3.56-.71 0-1.37-.2-1.95-.5v.03c0 2.08 1.48 3.82 3.44 4.21a4.22 4.22 0 0 1-1.93.07 4.28 4.28 0 0 0 4 2.98 8.521 8.521 0 0 1-5.33 1.84c-.34 0-.68-.02-1.02-.06C3.44 20.29 5.7 21 8.12 21 16 21 20.33 14.46 20.33 8.79c0-.19 0-.37-.01-.56.84-.6 1.56-1.36 2.14-2.23z" />
+                    </svg>
+                  </a>
+                  )}
+                  {userProfile?.instagram_username && (
+                    <a
+                      href={`https://instagram.com/${userProfile.instagram_username}`}
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      className="text-gray-600 hover:text-pink-600"
+                    >
+                      <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" width="24" height="24" fill="currentColor">
+                        <path d="M12 2C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2zm-.35 15.5c-3.51 0-6.35-2.84-6.35-6.35S8.14 4.8 11.65 4.8s6.35 2.84 6.35 6.35-2.84 6.35-6.35 6.35zm0-13c-3.31 0-6 1.79-6 4s1.79 4 4 4 6-1.79 6-4-1.79-4-4-4z" />
+                    </svg>
+                  </a>
+                  )}
+                  {userProfile?.facebook_username && (
+                    <a
+                      href={`https://facebook.com/${userProfile.facebook_username}`}
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      className="text-gray-600 hover:text-blue-600"
+                    >
+                      <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" width="24" height="24" fill="currentColor">
+                        <path d="M20 3H4a1 1 0 0 0-1 1v16a1 1 0 0 0 1 1h8v-7h-2v-3h2V8.5C12 7.12 13.12 6 14.5 6H20a1 1 0 0 0 1-1V4a1 1 0 0 0-1-1z" />
+                      </svg>
+                    </a>
+                  )}
+                  {userProfile?.website_url && (
+                    <a
+                      href={userProfile.website_url}
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      className="text-gray-600 hover:text-gray-800"
+                    >
+                      <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" width="24" height="24" fill="currentColor">
+                        <path d="M12 2C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2zm-.35 15.5c-3.51 0-6.35-2.84-6.35-6.35S8.14 4.8 11.65 4.8s6.35 2.84 6.35 6.35-2.84 6.35-6.35 6.35zm0-13c-3.31 0-6 1.79-6 4s1.79 4 4 4 6-1.79 6-4-1.79-4-4-4z" />
+                    </svg>
+                  </a>
+                  )}
+                </div>
+              </div>
+              
+              {/* プロフィール編集ボタン */}
+              <Button 
+                variant="secondary"
+                onClick={() => {
+                  console.log('プロフィール編集ボタンがクリックされました');
+                  navigate('/settings');
+                }}
+                className="inline-flex items-center text-sm"
+              >
+                <Edit className="mr-2 h-4 w-4" />
+                プロフィール編集
+              </Button>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      {/* メインコンテンツ */}
+      <main className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 pb-8">
+        {/* 月間投稿グラフ */}
+        <div className="bg-white rounded-lg shadow-md p-6 mb-8">
+          <h2 className="text-xl font-bold">アクティビティ</h2>
+          <div className="h-64">
+            <div className="flex justify-center mb-4">
+              <Loader2 className="w-12 h-12 text-gray-300" />
+            </div>
+            <h3 className="text-lg font-medium text-gray-900 mb-2">月間投稿グラフ</h3>
+            <p className="text-gray-500">
+              まだ作品がありません。
+            </p>
+          </div>
+        </div>
+
+        {/* 職歴セクション */}
+        <div className="bg-white rounded-lg shadow-md p-6 mb-8">
+          <div className="flex justify-between items-center mb-4">
+            <h2 className="text-xl font-bold">職歴</h2>
+            <Button 
+              variant="primary" 
+              size="sm"
+              onClick={() => openCareerEditDialog()}
+            >
+              <PlusCircle className="w-4 h-4 mr-2" />
+              追加
+            </Button>
+          </div>
+          <div className="space-y-6">
+            {careers.map((career: Career) => (
+              <div key={career.id} className="relative pl-6 before:content-[''] before:absolute before:left-0 before:top-2 before:w-3 before:h-3 before:bg-primary-500 before:rounded-full before:z-10">
+                <div className="absolute left-[5.5px] top-5 bottom-0 w-0.5 bg-gray-200 -z-10"></div>
+                <div className="flex justify-between items-start">
+                  <div>
+                    <h3 className="font-medium text-lg">{career.company}</h3>
+                    <p className="text-gray-700">{career.position} / {career.department}</p>
+                    <p className="text-sm text-gray-500 mt-1">
+                      {career.startDate} - {career.isCurrentPosition ? '現在' : career.endDate}
+                    </p>
+                  </div>
+                  <Button 
+                    variant="secondary" 
+                    size="sm"
+                    onClick={() => openCareerEditDialog(career)}
+                  >
+                    <Edit className="w-4 h-4" />
+                  </Button>
+                </div>
+              </div>
+            ))}
+          </div>
+        </div>
+
+        {/* キャリア編集ダイアログ */}
+        {showCareerDialog && (
+          <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
+            <div className="bg-white rounded-lg p-6 w-full max-w-md">
+              <div className="flex justify-between items-center mb-4">
+                <h3 className="text-lg font-medium">
+                  {editingCareer ? 'キャリア情報を編集' : '新しいキャリアを追加'}
+                </h3>
+                <button
+                  onClick={() => setShowCareerDialog(false)}
+                  className="text-gray-500 hover:text-gray-700"
+                >
+                  ✕
+                </button>
+              </div>
+              <form onSubmit={(e: React.FormEvent) => { e.preventDefault(); saveCareer(); }}>
+                <div className="space-y-4">
+                  <div>
+                    <label className="block text-sm font-medium text-gray-700 mb-1">
+                      会社名 *
+                    </label>
+                    <input
+                      type="text"
+                      value={companyName}
+                      onChange={handleCompanyNameChange}
+                      className="w-full px-3 py-2 border border-gray-300 rounded-md"
+                      required
+                    />
+                  </div>
+                  <div>
+                    <label className="block text-sm font-medium text-gray-700 mb-1">
+                      役職 *
+                    </label>
+                    <input
+                      type="text"
+                      value={position}
+                      onChange={handlePositionChange}
+                      className="w-full px-3 py-2 border border-gray-300 rounded-md"
+                      required
+                    />
+                  </div>
+                  <div>
+                    <label className="block text-sm font-medium text-gray-700 mb-1">
+                      部署
+                    </label>
+                    <input
+                      type="text"
+                      value={department}
+                      onChange={handleDepartmentChange}
+                      className="w-full px-3 py-2 border border-gray-300 rounded-md"
+                    />
+                  </div>
+                  <div>
+                    <label className="block text-sm font-medium text-gray-700 mb-1">
+                      開始日 *
+                    </label>
+                    <input
+                      type="date"
+                      value={startDate}
+                      onChange={handleStartDateChange}
+                      className="w-full px-3 py-2 border border-gray-300 rounded-md"
+                      required
+                    />
+                  </div>
+                  <div className="flex items-center mb-4">
+                    <input
+                      type="checkbox"
+                      id="isCurrentJob"
+                      checked={isCurrentJob}
+                      onChange={handleIsCurrentJobChange}
+                      className="mr-2"
+                    />
+                    <label htmlFor="isCurrentJob" className="text-sm font-medium text-gray-700">
+                      現在の職場
+                    </label>
+                  </div>
+                  {!isCurrentJob && (
+                    <div>
+                      <label className="block text-sm font-medium text-gray-700 mb-1">
+                        終了日
+                      </label>
+                      <input
+                        type="date"
+                        value={endDate}
+                        onChange={handleEndDateChange}
+                        className="w-full px-3 py-2 border border-gray-300 rounded-md"
+                      />
+                    </div>
+                  )}
+                </div>
+                <div className="mt-6 flex justify-end space-x-3">
+                  <Button
+                    onClick={() => setShowCareerDialog(false)}
+                    variant="secondary"
+                    type="button"
+                  >
+                    キャンセル
+                  </Button>
+                  <Button
+                    variant="primary"
+                    type="submit"
+                  >
+                    保存
+                  </Button>
+                </div>
+              </form>
+            </div>
+          </div>
+        )}
+
+        {/* AI分析結果 */}
+        <div className="mb-8">
+          <div className="flex justify-between items-center mb-4">
+            <h2 className="text-xl font-bold">AI分析結果</h2>
+            <Button 
+              onClick={runAIAnalysis} 
+              disabled={isAnalyzing || works.length === 0}
+              className="flex items-center"
+            >
+              <Zap className="w-4 h-4 mr-2" />
+              AI分析を実行
+            </Button>
+          </div>
+
+          {isAnalyzing ? (
+            <div className="bg-white rounded-lg shadow-md p-8 text-center">
+              <div className="flex justify-center mb-4">
+                <Loader2 className="w-12 h-12 text-primary animate-spin" />
+              </div>
+              <h3 className="text-lg font-medium text-gray-900 mb-2">AI分析を実行中...</h3>
+              <p className="text-gray-500">
+                あなたの作品を分析しています。しばらくお待ちください。
+              </p>
+            </div>
+          ) : displayAiResult ? (
+            <div className="bg-white rounded-lg shadow-md p-6">
+              <h3 className="text-lg font-semibold mb-4 flex items-center">
+                <Award className="w-5 h-5 text-yellow-500 mr-2" />
+                作品の魅力ポイント
+              </h3>
+              <p className="text-gray-700 mb-6">{displayAiResult.talent?.summary}</p>
+              
+              <div className="grid grid-cols-1 md:grid-cols-3 gap-6 mb-6">
+                {/* 専門性 */}
+                <div className="bg-blue-50 rounded-lg p-4">
+                  <h4 className="text-md font-semibold mb-2 flex items-center text-blue-700">
+                    <BookOpen className="w-4 h-4 mr-2" />
+                    専門性
+                  </h4>
+                  <p className="text-gray-700 text-sm mb-3">{displayAiResult.expertise?.summary || "専門分野における深い知識と経験が見られます。"}</p>
+                  <div className="flex flex-wrap gap-1 mb-2">
+                    {displayAiResult.expertise?.areas?.map((area: string) => (
+                      <Badge key={area} variant="secondary" className="text-xs">
+                        {area}
+                      </Badge>
+                    ))}
+                  </div>
+                  <div className="w-full bg-gray-200 rounded-full h-1.5">
+                    <div 
+                      className="bg-blue-600 h-1.5 rounded-full" 
+                      style={{ width: `${(displayAiResult.expertise?.level || 5) * 10}%` }}
+                    ></div>
+                  </div>
+                </div>
+                
+                {/* 個別性 */}
+                <div className="bg-purple-50 rounded-lg p-4">
+                  <h4 className="text-md font-semibold mb-2 flex items-center text-purple-700">
+                    <Fingerprint className="w-4 h-4 mr-2" />
+                    個別性
+                  </h4>
+                  <p className="text-gray-700 text-sm mb-3">{displayAiResult.uniqueness?.summary || "独自の視点と表現方法が作品に反映されています。"}</p>
+                  <div className="flex flex-wrap gap-1 mb-2">
+                    {displayAiResult.uniqueness?.differentiators?.map((item: string) => (
+                      <Badge key={item} variant="secondary" className="text-xs">
+                        {item}
+                      </Badge>
+                    ))}
+                  </div>
+                  <div className="w-full bg-gray-200 rounded-full h-1.5">
+                    <div 
+                      className="bg-purple-600 h-1.5 rounded-full" 
+                      style={{ width: `${(displayAiResult.uniqueness?.level || 5) * 10}%` }}
+                    ></div>
+                  </div>
+                </div>
+                
+                {/* 興味・関心 */}
+                <div className="bg-green-50 rounded-lg p-4">
+                  <h4 className="text-md font-semibold mb-2 flex items-center text-green-700">
+                    <Compass className="w-4 h-4 mr-2" />
+                    興味・関心
+                  </h4>
+                  <p className="text-gray-700 text-sm mb-3">{displayAiResult.interests?.summary || "多様な分野への探求心が作品に表れています。"}</p>
+                  <div className="flex flex-wrap gap-1 mb-2">
+                    {displayAiResult.interests?.areas?.map((area: string) => (
+                      <Badge key={area} variant="secondary" className="text-xs">
+                        {area}
+                      </Badge>
+                    ))}
+                  </div>
+                  <div className="w-full bg-gray-200 rounded-full h-1.5">
+                    <div 
+                      className="bg-green-600 h-1.5 rounded-full" 
+                      style={{ width: `${(displayAiResult.interests?.level || 5) * 10}%` }}
+                    ></div>
+                  </div>
+                </div>
+              </div>
+              
+              <div className="border-t border-gray-200 pt-4">
+                <h4 className="text-md font-semibold mb-2">専門分野カテゴリ</h4>
+                <div className="flex flex-wrap gap-2 mb-4">
+                  {displayAiResult.specialties?.map((specialty: string) => (
+                    <Badge key={specialty} variant="secondary" className="text-xs">
+                      {specialty}
+                    </Badge>
+                  ))}
+                </div>
+                
+                <h4 className="text-md font-semibold mb-2">デザインスタイル</h4>
+                <div className="flex flex-wrap gap-2">
+                  {displayAiResult.designStyles?.map((style: string) => (
+                    <Badge key={style} variant="secondary" className="text-xs">
+                      {style}
+                    </Badge>
+                  ))}
+                </div>
+              </div>
+            </div>
+          ) : (
+            <div className="bg-white rounded-lg shadow-md p-8 text-center">
+              <div className="flex justify-center mb-4">
+                <Zap className="w-12 h-12 text-gray-300" />
+              </div>
+              <h3 className="text-lg font-medium text-gray-900 mb-2">AI分析を実行</h3>
+              <p className="text-gray-500 mb-4">
+                あなたの作品を分析して、専門性、個別性、興味・関心の3つの指標でポートフォリオの特徴を把握できます。
+              </p>
+              <p className="text-sm text-gray-400">
+                ※分析には作品データが必要です。作品を追加してから実行してください。
+              </p>
+            </div>
+          )}
+        </div>
+
+        {/* 作品一覧 */}
+        <div className="mb-8">
+          <div className="flex justify-between items-center mb-6">
+            <h2 className="text-2xl font-bold text-gray-900">作品一覧</h2>
+            <Button 
+              variant="secondary"
+              onClick={() => navigate('/works/new')}
+            >
+              <PlusCircle className="w-4 h-4 mr-2" />
+              作品を追加
+            </Button>
+          </div>
+          
+          {works.length > 0 ? (
+            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+              {works.map((work) => (
+                <div key={work.id} className="overflow-hidden hover:shadow-lg transition-shadow">
+                  <a href={`/works/${work.id}`}>
+                    <div className="h-48 bg-gray-200 relative">
+                      {work.image_url ? (
+                        <img 
+                          src={work.image_url} 
+                          alt={work.title} 
+                          className="w-full h-full object-cover"
+                        />
+                      ) : (
+                        <div className="flex items-center justify-center h-full bg-gray-100">
+                          <FileText className="h-12 w-12 text-gray-400" />
+                        </div>
+                      )}
+                    </div>
+                    <div className="p-4">
+                      <h3 className="font-semibold text-lg mb-1 line-clamp-1">{work.title}</h3>
+                      <p className="text-gray-600 text-sm mb-2 line-clamp-2">{work.description}</p>
+                      <div className="flex flex-wrap gap-1 mb-3">
+                        {work.tags && work.tags.map((tag: string) => (
+                          <Badge key={tag} variant="secondary" className="text-xs">
+                            {tag}
+                          </Badge>
+                        ))}
+                      </div>
+                      <div className="flex justify-between text-sm text-gray-500">
+                        <span>{new Date(work.created_at).toLocaleDateString()}</span>
+                      </div>
+                    </div>
+                  </a>
+                </div>
+              ))}
+            </div>
+          ) : (
+            <div className="bg-white rounded-lg shadow-md p-8 text-center">
+              <div className="flex justify-center mb-4">
+                <FileText className="w-12 h-12 text-gray-300" />
+              </div>
+              <h3 className="text-lg font-medium text-gray-900 mb-2">まだ作品がありません</h3>
+              <p className="text-gray-500 mb-4">
+                あなたの最初の作品を追加しましょう。
+              </p>
+              <Button 
+                onClick={() => navigate('/works/new')}
+              >
+                <PlusCircle className="w-4 h-4 mr-2" />
+                作品を追加
+              </Button>
+            </div>
+          )}
+        </div>
+      </main>
+    </div>
+  );
+};
+
+export default Mypage;
