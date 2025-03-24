@@ -1,4 +1,6 @@
-import React, { useState, useEffect, useCallback } from 'react';
+? Select the type of function you'd like to create (Use arrow keys)
+❯ Edge function (Deno) 
+  Serverless function (Node/Go/Rust)import React, { useState, useEffect, useCallback } from 'react';
 import { supabase } from '../lib/supabase';
 import { 
   Edit, 
@@ -72,7 +74,7 @@ interface AIAnalysisResult {
   expertise: {
     summary: string; // 専門性
   };
-  content_style: {
+  talent: { // content_styleをtalentに変更
     summary: string; // コンテンツスタイル
   };
   uniqueness: {
@@ -324,8 +326,8 @@ const Mypage: React.FC = () => {
           expertise: {
             summary: insightData.expertise?.summary || ''
           },
-          content_style: {
-            summary: insightData.content_style?.summary || ''
+          talent: { // content_styleをtalentに変更
+            summary: insightData.talent?.summary || ''
           },
           uniqueness: {
             summary: insightData.uniqueness?.summary || ''
@@ -367,8 +369,8 @@ const Mypage: React.FC = () => {
           expertise: {
             summary: insightData.expertise?.summary || ''
           },
-          content_style: {
-            summary: insightData.content_style?.summary || ''
+          talent: { // content_styleをtalentに変更
+            summary: insightData.talent?.summary || ''
           },
           uniqueness: {
             summary: insightData.uniqueness?.summary || ''
@@ -423,8 +425,8 @@ const Mypage: React.FC = () => {
         expertise: {
           summary: result.data?.expertise?.summary || ''
         },
-        content_style: {
-          summary: result.data?.content_style?.summary || ''
+        talent: { // content_styleをtalentに変更
+          summary: result.data?.talent?.summary || ''
         },
         uniqueness: {
           summary: result.data?.uniqueness?.summary || ''
@@ -444,7 +446,7 @@ const Mypage: React.FC = () => {
           .upsert({
             user_id: userProfile.id,
             expertise: result.data?.expertise,
-            talent: result.data?.content_style, // content_styleをtalentカラムに保存
+            talent: result.data?.talent, // content_styleをtalentに変更
             uniqueness: result.data?.uniqueness,
             specialties: result.data?.specialties,
             interests: result.data?.interests,
@@ -1079,7 +1081,7 @@ const Mypage: React.FC = () => {
                   <Star className="h-6 w-6 text-gray-600 mt-1 mr-2" />
                   <div>
                     <h3 className="font-medium text-gray-800">コンテンツスタイル</h3>
-                    <p className="text-gray-700">{aiAnalysisResult.content_style.summary}</p>
+                    <p className="text-gray-700">{aiAnalysisResult.talent.summary}</p>
                   </div>
                 </div>
               </div>

@@ -59,164 +59,43 @@ export async function generateTagsForWork(workId: string): Promise<{ success: bo
 }
 
 /**
- * ユーザーのすべての作品のタグを分析するAPIエンドポイント
+ * ユーザーのタグを分析する
  * @param userId ユーザーID
- * @returns タグ分析結果
+ * @returns 分析結果
  */
-export async function analyzeUserTags(userId: string): Promise<{ success: boolean; data?: Record<string, any>; error?: string }> {
+export const analyzeUserTagsApi = async (userId: string): Promise<{ success: boolean; data?: any; error?: string }> => {
   try {
-    // ユーザーの作品を取得
-    const { data: works, error: worksError } = await supabase
-      .from('works')
-      .select('id, title, description, source_url')
-      .eq('user_id', userId);
+    // Netlify Functionを呼び出す
+    const response = await fetch('/.netlify/functions/analyze-tags', {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify({ userId }),
+    });
 
-    if (worksError) {
-      console.error('Error fetching works:', worksError);
-      return { success: false, error: 'Failed to fetch user works' };
-    }
-
-    if (!works || works.length === 0) {
-      return { success: false, error: 'No works found for this user' };
-    }
-
-    // すべての作品からタグを収集
-    const allTags: Record<string, number> = {};
-    
-    // 各作品のタグを取得
-    for (const work of works) {
-      const { data: workTags, error: tagsError } = await supabase
-        .from('work_tags')
-        .select('tags(name)')
-        .eq('work_id', work.id);
-      
-      if (tagsError) {
-        console.error(`Error fetching tags for work ${work.id}:`, tagsError);
-        continue;
-      }
-      
-      if (workTags && workTags.length > 0) {
-        workTags.forEach((item: { tags?: { name: string } }) => {
-          const tagName = item.tags?.name;
-          if (tagName) {
-            allTags[tagName] = (allTags[tagName] || 0) + 1;
-          }
-        });
-      }
-    }
-
-    // タグが見つからない場合
-    if (Object.keys(allTags).length === 0) {
-      return { 
-        success: true, 
-        data: {
-          expertise: { summary: "まだ十分なデータがないため、専門性を分析できません。作品にタグを追加してください。" },
-          content_style: { summary: "まだ十分なデータがないため、コンテンツスタイルを分析できません。作品にタグを追加してください。" },
-          uniqueness: { summary: "まだ十分なデータがないため、作品のユニークさを分析できません。作品にタグを追加してください。" },
-          specialties: [],
-          interests: { topics: [] }
-        } 
+    if (!response.ok) {
+      const errorData = await response.json();
+      console.error('Error from analyze-tags function:', errorData);
+      return {
+        success: false,
+        error: errorData.error || `API error: ${response.status}`,
       };
     }
 
-    // タグを頻度順にソート
-    const sortedTags = Object.entries(allTags)
-      .sort((a, b) => b[1] - a[1])
-      .map(([name, count]) => ({ name, count }));
-
-    // 上位のタグを抽出
-    const topTags = sortedTags.slice(0, 15).map(tag => tag.name);
-
-    // Gemini APIを使用してタグ分析を行う
-    const genAI = new GoogleGenerativeAI(GEMINI_API_KEY);
-    const model = genAI.getGenerativeModel({ model: "gemini-pro" });
-
-    // プロンプトを作成
-    const prompt = `
-以下のタグリストは、あるクリエイターの作品に付けられたタグです。これらのタグを分析して、クリエイターの特徴を3つの観点から分析してください。
-
-タグリスト: ${topTags.join(', ')}
-
-以下の3つの観点から分析し、それぞれ100-150文字程度の日本語で簡潔に説明してください:
-
-1. 専門性: このクリエイターの専門分野や得意とする領域は何か
-2. コンテンツスタイル: このクリエイターの表現方法や作品の特徴的なスタイルは何か
-3. 作品のユニークさ: このクリエイターの作品が持つ独自性や他と差別化できる点は何か
-
-回答はJSON形式で以下のように構造化してください:
-{
-  "expertise": {
-    "summary": "専門性の分析結果"
-  },
-  "content_style": {
-    "summary": "コンテンツスタイルの分析結果"
-  },
-  "uniqueness": {
-    "summary": "作品のユニークさの分析結果"
-  }
-}
-`;
-
-    try {
-      const result = await model.generateContent(prompt);
-      const response = await result.response;
-      const text = response.text();
-      
-      // JSONを抽出して解析
-      const jsonMatch = text.match(/\{[\s\S]*\}/);
-      if (jsonMatch) {
-        const jsonText = jsonMatch[0];
-        const analysisData = JSON.parse(jsonText);
-        
-        // 専門分野タグを抽出（上位10件）
-        const specialties = sortedTags.slice(0, 10).map(tag => tag.name);
-        
-        // 興味関心タグを抽出（11-20件）
-        const interests = {
-          topics: sortedTags.slice(10, 20).map(tag => tag.name)
-        };
-        
-        return { 
-          success: true, 
-          data: {
-            ...analysisData,
-            specialties,
-            interests
-          } 
-        };
-      } else {
-        console.error('Failed to extract JSON from AI response');
-        return { 
-          success: true, 
-          data: {
-            expertise: { summary: "タグに基づく専門性の分析に失敗しました。" },
-            content_style: { summary: "タグに基づくコンテンツスタイルの分析に失敗しました。" },
-            uniqueness: { summary: "タグに基づく作品のユニークさの分析に失敗しました。" },
-            specialties: sortedTags.slice(0, 10).map(tag => tag.name),
-            interests: { topics: sortedTags.slice(10, 20).map(tag => tag.name) }
-          } 
-        };
-      }
-    } catch (error) {
-      console.error('Error analyzing tags with Gemini:', error);
-      
-      // AI分析に失敗した場合のフォールバック
-      return { 
-        success: true, 
-        data: {
-          expertise: { summary: "タグから抽出された専門性: " + topTags.slice(0, 3).join(', ') },
-          content_style: { summary: "タグから抽出されたコンテンツスタイル: " + topTags.slice(3, 6).join(', ') },
-          uniqueness: { summary: "タグから抽出された作品のユニークさ: " + topTags.slice(6, 9).join(', ') },
-          specialties: sortedTags.slice(0, 10).map(tag => tag.name),
-          interests: { topics: sortedTags.slice(10, 20).map(tag => tag.name) }
-        } 
-      };
-    }
+    const data = await response.json();
+    return {
+      success: true,
+      data: data.data,
+    };
   } catch (error) {
-    console.error('Error in analyzeUserTags:', error);
-    return { success: false, error: 'Failed to analyze user tags' };
+    console.error('Error in analyzeUserTagsApi:', error);
+    return {
+      success: false,
+      error: error instanceof Error ? error.message : '不明なエラーが発生しました',
+    };
   }
-}
+};
 
 /**
  * タグをデータベースに保存する関数
