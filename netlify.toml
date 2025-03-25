@@ -72,3 +72,4 @@
 # Puppeteer用の環境変数
 [build.environment]
   PUPPETEER_SKIP_CHROMIUM_DOWNLOAD = "true"
+  NETLIFY_NEXT_PLUGIN_SKIP = "true"
