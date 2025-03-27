@@ -115,22 +115,28 @@ exports.handler = async function(event, context) {
     const newTagData = { 
       name, 
       category,
-      created_at: new Date().toISOString()
+      created_at: new Date().toISOString(),
+      updated_at: new Date().toISOString()
     };
     
     const { data: newTag, error: insertError } = await supabase
       .from('tags')
       .insert([newTagData])
-      .select('id, name, category')
+      .select('id, name, category, created_at')
       .single();
     
     if (insertError) {
-      console.error('タグの作成中にエラーが発生しました:', insertError);
+      console.error('タグの作成中にエラーが発生しました:', JSON.stringify(insertError, null, 2));
+      console.error('エラーコード:', insertError.code);
+      console.error('エラーメッセージ:', insertError.message);
+      console.error('リクエストデータ:', JSON.stringify(newTagData, null, 2));
+      
       return {
         statusCode: 500,
         body: JSON.stringify({ 
           error: `タグの作成中にエラーが発生しました: ${insertError.message}`,
-          details: insertError
+          details: insertError,
+          request_data: newTagData
         })
       };
     }
