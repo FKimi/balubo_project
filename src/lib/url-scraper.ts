@@ -37,7 +37,7 @@ function getApiEndpoint(): string {
     return '/.netlify/functions/scrape-url';
   } else {
     // 本番環境ではデプロイ済みのNetlify Functionを使用
-    return 'https://stupendous-llama-975208.netlify.app/.netlify/functions/scrape-url';
+    return 'https://balubo.netlify.app/.netlify/functions/scrape-url';
   }
 }
 

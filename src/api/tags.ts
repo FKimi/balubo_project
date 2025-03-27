@@ -3,7 +3,7 @@ import { createTagWithAdmin, testSupabaseAdminConnection } from '../lib/supabase
 
 // Netlify FunctionsのURL
 const NETLIFY_FUNCTIONS_BASE_URL = import.meta.env.PROD 
-  ? 'https://stupendous-llama-975208.netlify.app/.netlify/functions'
+  ? 'https://balubo.netlify.app/.netlify/functions'
   : 'http://localhost:8888/.netlify/functions';
 
 // 開発環境かどうかを判定
