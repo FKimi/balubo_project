@@ -41,14 +41,14 @@ export function LoginForm() {
       const { error } = await supabase.auth.signInWithOAuth({
         provider: 'google',
         options: {
-          redirectTo: `${window.location.origin}/auth/callback`,
+          redirectTo: `${window.location.origin}/auth/callback?redirectFrom=/mypage`,
         },
       });
       
       if (error) throw error;
       
       // Google認証はリダイレクトするため、ここではnavigateは不要
-      // 認証後はAuthCallbackコンポーネントで/mypageに自動的にリダイレクトされます
+      // 認証後はAuthCallbackコンポーネントで指定したリダイレクト先に自動的にリダイレクトされます
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Googleログイン中にエラーが発生しました');
       setGoogleLoading(false);

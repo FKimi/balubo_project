@@ -1,9 +1,10 @@
 import { useEffect, useState } from 'react';
-import { useNavigate } from 'react-router-dom';
+import { useNavigate, useLocation } from 'react-router-dom';
 import { supabase } from '../lib/supabase';
 
 export function AuthCallback() {
   const navigate = useNavigate();
+  const location = useLocation();
   const [error, setError] = useState<string | null>(null);
   const [loading, setLoading] = useState(true);
 
@@ -14,6 +15,10 @@ export function AuthCallback() {
         const hashParams = new URLSearchParams(window.location.hash.substring(1));
         const accessToken = hashParams.get('access_token');
         const refreshToken = hashParams.get('refresh_token');
+        
+        // リダイレクト元のページを取得（URLのクエリパラメータから）
+        const searchParams = new URLSearchParams(location.search);
+        const redirectFrom = searchParams.get('redirectFrom') || '/mypage';
 
         if (accessToken && refreshToken) {
           // セッションを設定
@@ -66,8 +71,8 @@ export function AuthCallback() {
               // エラーがあっても認証自体は成功しているので続行
             }
 
-            // ダッシュボードにリダイレクト
-            navigate('/mypage');
+            // リダイレクト元のページに戻るか、デフォルトでマイページに遷移
+            navigate(redirectFrom);
           } else {
             setError('ユーザー情報の取得に失敗しました');
           }
@@ -83,7 +88,7 @@ export function AuthCallback() {
     };
 
     handleAuthCallback();
-  }, [navigate]);
+  }, [navigate, location]);
 
   return (
     <div className="min-h-screen bg-gray-50 flex flex-col justify-center items-center p-4">
@@ -103,12 +108,7 @@ export function AuthCallback() {
             ログインページに戻る
           </button>
         </div>
-      ) : (
-        <div className="max-w-md w-full bg-white p-8 rounded-lg shadow-md">
-          <h2 className="text-2xl font-bold text-green-600 mb-4">認証成功</h2>
-          <p className="text-gray-700 mb-6">リダイレクト中...</p>
-        </div>
-      )}
+      ) : null}
     </div>
   );
 }

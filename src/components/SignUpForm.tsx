@@ -47,8 +47,8 @@ export function SignUpForm() {
       // Supabaseの認証URLを直接使用
       const supabaseUrl = import.meta.env.VITE_SUPABASE_URL || '';
       const redirectUri = isLocalhost 
-        ? `${window.location.origin}/auth/callback`
-        : `${supabaseUrl}/auth/callback`;
+        ? `${window.location.origin}/auth/callback?redirectFrom=/login`
+        : `${supabaseUrl}/auth/callback?redirectFrom=/login`;
       
       console.log('Using redirect URI:', redirectUri);
       console.log('Current origin:', window.location.origin);
@@ -71,7 +71,7 @@ export function SignUpForm() {
       if (error) throw error;
       
       // Google認証はリダイレクトするため、ここではnavigateは不要
-      // 認証後はAuthCallbackコンポーネントで/mypageに自動的にリダイレクトされます
+      // 認証後はAuthCallbackコンポーネントで指定したリダイレクト先に自動的にリダイレクトされます
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Googleログイン中にエラーが発生しました');
       setGoogleLoading(false);
