@@ -4,7 +4,7 @@ import { supabase } from '../../lib/supabase';
 import { analyzeContent } from '../../lib/gemini';
 import { extractDataFromUrl } from '../../lib/gemini-url-service';
 import { extractDataFromUrlWithMetadata } from '../../lib/url-metadata';
-import { createTag } from '../../api/tags'; // createTag関数をインポート
+import { createTag } from '../../api/tags'; 
 import { ArrowLeft, FileText, ImageIcon, Loader2, BrainCircuit, X, Camera, Trash2 } from 'lucide-react';
 
 // ContentInput型定義をインポートせずに直接定義
@@ -43,11 +43,11 @@ interface WorkData {
   design_url: string;
   behance_url: string;
   dribbble_url: string;
-  work_type: string; // typeからwork_typeに変更
+  work_type: string; 
   is_public: boolean;
   user_id: string;
-  tags?: string[]; // tagsプロパティを追加
-  roles?: string[]; // rolesプロパティを追加
+  tags?: string[]; 
+  roles?: string[]; 
 }
 
 export const AddWork = () => {
@@ -84,7 +84,6 @@ export const AddWork = () => {
     dribbble_url: '',
     is_public: true,
     roles: [] as string[],
-    // 画像アップロード関連のフィールドを追加
     image_file: null as File | null,
     image_preview: '' as string
   });
@@ -100,7 +99,6 @@ export const AddWork = () => {
       try {
         setLoading(true);
         
-        // 作品データを取得
         const { data: workData, error: workError } = await supabase
           .from('works')
           .select('*')
@@ -110,7 +108,6 @@ export const AddWork = () => {
         if (workError) throw workError;
         if (!workData) throw new Error('作品が見つかりませんでした');
         
-        // タグを取得
         const { data: workTags, error: tagsError } = await supabase
           .from('work_tags')
           .select('tags(name)')
@@ -118,7 +115,6 @@ export const AddWork = () => {
         
         if (tagsError) throw tagsError;
         
-        // タグデータの型定義
         interface WorkTag {
           tags?: {
             name?: string;
@@ -127,16 +123,13 @@ export const AddWork = () => {
           }[] | null;
         }
         
-        // タグ名の配列を作成
         const tags = workTags
           ? (workTags as WorkTag[])
               .filter((wt: WorkTag) => wt.tags)
               .map((wt: WorkTag) => {
-                // tagsがオブジェクトの場合
                 if (wt.tags && typeof wt.tags === 'object' && !Array.isArray(wt.tags) && 'name' in wt.tags) {
                   return wt.tags.name;
                 }
-                // tagsが配列の場合
                 else if (Array.isArray(wt.tags) && wt.tags.length > 0 && 'name' in wt.tags[0]) {
                   return wt.tags[0].name;
                 }
@@ -145,7 +138,6 @@ export const AddWork = () => {
               .filter((tag): tag is string => tag !== null)
           : [];
         
-        // フォームに既存データを設定
         setForm({
           title: workData.title || '',
           description: workData.description || '',
@@ -163,7 +155,6 @@ export const AddWork = () => {
           image_preview: workData.thumbnail_url || ''
         });
         
-        // 作品タイプに基づいて選択状態を更新
         setSelectedType(workData.work_type || 'writing');
         setInitialDataLoaded(true);
       } catch (error) {
@@ -177,13 +168,11 @@ export const AddWork = () => {
     fetchWorkData();
   }, [workId]);
 
-  // URLからデータを取得する関数
   const fetchUrlData = async (url: string) => {
     if (!url || !url.trim() || !url.startsWith('http')) {
       return;
     }
 
-    // 既にデータが読み込まれている編集モードでは、URLからのデータ取得をスキップ
     if (isEditMode && initialDataLoaded) {
       return;
     }
@@ -194,7 +183,6 @@ export const AddWork = () => {
       
       console.log("URLからデータを取得します:", url);
       
-      // LinkPreview APIを使用してメタデータを取得
       const metadata = await extractDataFromUrlWithMetadata(url);
       
       console.log("取得したメタデータ:", metadata);
@@ -208,8 +196,6 @@ export const AddWork = () => {
           source_url: url
         }));
       } else {
-        // LinkPreview APIが失敗した場合、Gemini APIを使用
-        console.log("LinkPreview APIでの取得に失敗しました。Gemini APIを使用します。");
         const fallbackData = await extractDataFromUrl(url);
         
         if (fallbackData) {
@@ -229,16 +215,13 @@ export const AddWork = () => {
     }
   };
 
-  // URLの入力を監視し、タイマーを使って自動取得
   const handleUrlChange = (url: string) => {
     setForm(prev => ({ ...prev, source_url: url }));
     
-    // 既存のタイマーをクリア
     if (urlFetchTimerRef.current) {
       clearTimeout(urlFetchTimerRef.current);
     }
     
-    // 有効なURLの場合、1秒後に自動取得
     if (url && url.trim() && url.startsWith('http')) {
       urlFetchTimerRef.current = setTimeout(() => {
         fetchUrlData(url);
@@ -246,7 +229,6 @@ export const AddWork = () => {
     }
   };
 
-  // AI分析を実行する関数
   const handleAiAnalysis = async () => {
     if (!form.title && !form.description) {
       setError('タイトルまたは説明文を入力してください');
@@ -266,16 +248,12 @@ export const AddWork = () => {
       const result = await analyzeContent(content);
       console.log('AI分析結果:', result);
 
-      // 分析結果を設定
       setAnalysisResult(result);
       
-      // 生成されたタグを設定
       if (result.interests && result.interests.tags) {
         const newTags = result.interests.tags.map(tag => {
-          // 英語タグを日本語に変換
           let japaneseTag = tag;
           
-          // 英語タグの日本語変換マッピング
           const tagTranslations: Record<string, string> = {
             "Regional Revitalization": "地域活性化",
             "Local Economy": "地域経済",
@@ -299,7 +277,6 @@ export const AddWork = () => {
             "Policy": "政策"
           };
           
-          // タグが英語の場合は日本語に変換
           if (tagTranslations[tag]) {
             japaneseTag = tagTranslations[tag];
           }
@@ -316,7 +293,6 @@ export const AddWork = () => {
       
       let errorMessage = 'AI分析中にエラーが発生しました。しばらく待ってから再試行してください。';
       
-      // エラーの種類に応じたメッセージ
       if (error instanceof Error) {
         if (error.message.includes("API key")) {
           errorMessage = "API keyが設定されていないか無効です。環境変数を確認してください。";
@@ -337,39 +313,33 @@ export const AddWork = () => {
     setForm(prev => ({ ...prev, [name]: value }));
   };
 
-  // 画像ファイル選択処理
   const handleFileSelect = (e: React.ChangeEvent<HTMLInputElement>) => {
     const files = e.target.files;
     if (!files || files.length === 0) return;
     
     const file = files[0];
-    // 画像ファイルのみ許可（MIME typeチェック）
     if (!file.type.startsWith('image/')) {
       setError('画像ファイルのみアップロードできます');
       return;
     }
     
-    // ファイルサイズチェック（5MB以下）
     if (file.size > 5 * 1024 * 1024) {
       setError('ファイルサイズは5MB以下にしてください');
       return;
     }
     
-    // プレビュー用のURLを作成
     const previewUrl = URL.createObjectURL(file);
     
     setForm(prev => ({
       ...prev,
       image_file: file,
       image_preview: previewUrl,
-      // デザイン作品の場合はサムネイルも自動設定
       thumbnail_url: selectedType === 'design' ? previewUrl : prev.thumbnail_url
     }));
     
     setError(null);
   };
   
-  // 画像ファイルのクリア処理
   const handleClearImage = () => {
     if (form.image_preview) {
       URL.revokeObjectURL(form.image_preview);
@@ -382,41 +352,82 @@ export const AddWork = () => {
     }));
   };
   
-  // 画像ファイルのアップロード処理
   const uploadImage = async (): Promise<string | null> => {
-    if (!form.image_file) return null;
-    
+    if (!form.image_file) {
+      console.error('画像ファイルがありません');
+      return null;
+    }
+
     try {
-      // ユーザー情報を取得
-      const { data: { user } } = await supabase.auth.getUser();
-      if (!user) throw new Error('ログインが必要です');
+      const { data: { session }, error: sessionError } = await supabase.auth.getSession();
+      if (sessionError || !session) {
+        throw new Error('認証が必要です');
+      }
       
-      // ファイル名を生成（ユニーク化）
+      const userId = session.user.id;
+      
       const fileExt = form.image_file.name.split('.').pop();
-      const fileName = `${user.id}_${Date.now()}.${fileExt}`;
-      const filePath = `designs/${fileName}`;
+      const fileName = `${userId}_${Date.now()}.${fileExt}`;
+      const filePath = `${userId}/${fileName}`;
       
-      // Supabaseストレージにアップロード
       const { error: uploadError } = await supabase.storage
         .from('works')
-        .upload(filePath, form.image_file);
+        .upload(filePath, form.image_file, {
+          cacheControl: '3600',
+          upsert: true
+        });
       
-      if (uploadError) throw uploadError;
+      if (uploadError) {
+        console.error('画像アップロードエラー:', JSON.stringify(uploadError, null, 2));
+        
+        if (uploadError.message && uploadError.message.includes('Bucket not found')) {
+          console.log('バケットが見つかりません。作成を試みます...');
+          
+          const { error: createBucketError } = await supabase.storage.createBucket('works', {
+            public: true,
+            allowedMimeTypes: ['image/png', 'image/jpeg', 'image/gif', 'image/webp'],
+            fileSizeLimit: 5 * 1024 * 1024 
+          });
+          
+          if (createBucketError) {
+            console.error('バケット作成エラー:', JSON.stringify(createBucketError, null, 2));
+            throw new Error('ストレージバケットの作成に失敗しました');
+          }
+          
+          const { error: retryError } = await supabase.storage
+            .from('works')
+            .upload(filePath, form.image_file, {
+              cacheControl: '3600',
+              upsert: true
+            });
+          
+          if (retryError) {
+            console.error('再アップロードエラー:', JSON.stringify(retryError, null, 2));
+            throw retryError;
+          }
+        } else {
+          throw uploadError;
+        }
+      }
       
-      // 公開URLを取得
-      const { data: { publicUrl } } = supabase.storage
+      const { data: publicUrlData } = supabase.storage
         .from('works')
         .getPublicUrl(filePath);
       
-      return publicUrl;
+      if (!publicUrlData || !publicUrlData.publicUrl) {
+        console.error('公開URL取得エラー:', publicUrlData);
+        throw new Error('画像の公開URLの取得に失敗しました');
+      }
+      
+      console.log('画像アップロード成功:', publicUrlData.publicUrl);
+      return publicUrlData.publicUrl;
     } catch (error) {
-      console.error('画像アップロードエラー:', error instanceof Error ? error.message : String(error));
-      setError('画像のアップロードに失敗しました');
+      console.error('画像アップロードエラー:', error instanceof Error ? error.message : JSON.stringify(error, null, 2));
+      setError(error instanceof Error ? error.message : '画像のアップロードに失敗しました');
       return null;
     }
   };
 
-  // フォーム送信処理
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     
@@ -424,25 +435,21 @@ export const AddWork = () => {
       setLoading(true);
       setError(null);
       
-      // デバッグ用：フォームの値をコンソールに表示
       console.log('送信するフォームデータ:', form);
       console.log('役割:', form.roles);
       
-      // ユーザー情報を取得
       const { data: { user } } = await supabase.auth.getUser();
       
       if (!user) {
         throw new Error('ログインが必要です');
       }
 
-      // デザインタイプの場合、画像のアップロードを確認
       if (selectedType === 'design' && !form.image_file && !form.thumbnail_url) {
         setError('デザイン・写真作品には画像のアップロードが必要です');
         setLoading(false);
         return;
       }
       
-      // 画像アップロード（デザインタイプの場合）
       let uploadedImageUrl = null;
       if (selectedType === 'design' && form.image_file) {
         uploadedImageUrl = await uploadImage();
@@ -453,7 +460,6 @@ export const AddWork = () => {
         }
       }
       
-      // 作品データの準備
       const workData: WorkData = {
         title: form.title,
         description: form.description,
@@ -470,14 +476,11 @@ export const AddWork = () => {
         roles: form.roles
       };
       
-      // tagsプロパティを削除（work_tagsテーブルで管理するため）
-      // eslint-disable-next-line @typescript-eslint/no-unused-vars
       const { tags, ...workDataWithoutTags } = workData;
       
       let savedWorkId: string;
       
       if (isEditMode) {
-        // 編集モード: 既存の作品を更新
         const { data: updateResult, error: updateError } = await supabase
           .from('works')
           .update(workDataWithoutTags)
@@ -492,7 +495,6 @@ export const AddWork = () => {
         
         savedWorkId = workId;
         
-        // 既存のタグ関連付けを削除
         const { error: deleteTagsError } = await supabase
           .from('work_tags')
           .delete()
@@ -500,7 +502,6 @@ export const AddWork = () => {
         
         if (deleteTagsError) throw deleteTagsError;
       } else {
-        // 新規作成モード: 新しい作品を挿入
         const { data: insertResult, error: insertError } = await supabase
           .from('works')
           .insert([workDataWithoutTags])
@@ -515,11 +516,9 @@ export const AddWork = () => {
         savedWorkId = insertResult[0].id;
       }
       
-      // タグを保存
       if (form.tags && form.tags.length > 0) {
         for (const tagName of form.tags) {
           try {
-            // 2.1 タグが存在するか確認、なければ作成
             const { data: existingTags } = await supabase
               .from('tags')
               .select('id')
@@ -527,10 +526,8 @@ export const AddWork = () => {
               .limit(1);
               
             if (existingTags && existingTags.length > 0) {
-              // 既存のタグが見つかった場合はそれを使用
               const tagId = existingTags[0].id;
               
-              // 2.2 作品とタグを関連付け
               const { error: relationError } = await supabase
                 .from('work_tags')
                 .insert([{ 
@@ -543,11 +540,9 @@ export const AddWork = () => {
                 console.error('タグの関連付けに失敗しました:', relationError);
               }
             } else {
-              // 既存のタグが見つからない場合、api/tags.tsのcreateTag関数を使用してタグを作成
               try {
                 console.log(`タグ "${tagName}" を作成します...`);
                 
-                // api/tags.tsのcreateTag関数を使用
                 const newTag = await createTag(tagName, 'user_generated');
                 
                 if (!newTag || !newTag.id) {
@@ -557,7 +552,6 @@ export const AddWork = () => {
                 
                 console.log(`タグ "${tagName}" を作成しました:`, newTag);
                 
-                // 作品とタグを関連付ける
                 const { error: relationError } = await supabase
                   .from('work_tags')
                   .insert([{ 
@@ -571,7 +565,6 @@ export const AddWork = () => {
                 }
               } catch (error) {
                 console.error(`タグ "${tagName}" の作成に失敗しました:`, error);
-                // エラーがあっても処理を続行（他のタグを処理する）
               }
             }
           } catch (error) {
@@ -580,7 +573,6 @@ export const AddWork = () => {
         }
       }
 
-      // 3. AI分析結果を保存
       if (analysisResult) {
         const { error: analysisError } = await supabase
           .from('work_analysis')
@@ -592,7 +584,6 @@ export const AddWork = () => {
         
         if (analysisError) {
           console.error('AI分析結果の保存に失敗しました:', analysisError);
-          // 分析結果の保存失敗はクリティカルではないので、処理を続行
         }
       }
 
@@ -609,7 +600,7 @@ export const AddWork = () => {
     setSelectedType(type);
     setForm(prev => ({
       ...prev,
-      work_type: type // typeからwork_typeに変更
+      work_type: type 
     }));
   };
 
@@ -644,7 +635,6 @@ export const AddWork = () => {
 
         <form id="work-form" onSubmit={handleSubmit} className="space-y-6">
           <div className="bg-white shadow rounded-lg p-6">
-            {/* 作品の種類選択 */}
             <div className="grid grid-cols-2 gap-4 mb-6">
               <button
                 type="button"
@@ -680,7 +670,6 @@ export const AddWork = () => {
               </button>
             </div>
 
-            {/* 作品タイトル入力フィールド */}
             <div className="mb-4">
               <label htmlFor="title" className="block text-sm font-medium text-gray-700 mb-1">
                 タイトル
@@ -697,7 +686,6 @@ export const AddWork = () => {
               />
             </div>
 
-            {/* 作品URL入力フィールド */}
             {selectedType === 'writing' && (
               <div className="mb-4">
                 <label className="block text-sm font-medium text-gray-700 mb-1">
@@ -726,7 +714,6 @@ export const AddWork = () => {
               </div>
             )}
 
-            {/* サムネイル画像表示 - 両方のタイプで表示 */}
             {form.thumbnail_url && (
               <div className="mb-4">
                 <label className="block text-sm font-medium text-gray-700 mb-1">
@@ -742,7 +729,6 @@ export const AddWork = () => {
               </div>
             )}
 
-            {/* 画像アップロード - デザインタイプの場合のみ表示 */}
             {selectedType === 'design' && (
               <div className="mb-4">
                 <label className="block text-sm font-medium text-gray-700 mb-1">
@@ -787,7 +773,6 @@ export const AddWork = () => {
               </div>
             )}
 
-            {/* デザインタイプの場合の追加フィールド */}
             {selectedType === 'design' && (
               <>
                 <div className="mb-4">
@@ -855,7 +840,6 @@ export const AddWork = () => {
               </>
             )}
 
-            {/* 説明文入力フィールド - 両方のタイプで表示 */}
             <div className="mb-4">
               <label htmlFor="description" className="block text-sm font-medium text-gray-700 mb-1">
                 説明文
@@ -895,7 +879,6 @@ export const AddWork = () => {
               </div>
             </div>
 
-            {/* タグ入力フィールド */}
             <div className="mb-4">
               <label htmlFor="tag-input" className="block text-sm font-medium text-gray-700 mb-1">
                 タグ
@@ -982,7 +965,6 @@ export const AddWork = () => {
               )}
             </div>
 
-            {/* クリエイターの役割入力欄 */}
             <div className="mb-4 border border-indigo-200 p-4 rounded-md bg-indigo-50">
               <label className="block text-sm font-medium text-gray-700 mb-1">
                 あなたの役割
@@ -1006,7 +988,6 @@ export const AddWork = () => {
               </div>
             </div>
 
-            {/* AI分析結果表示 */}
             {analysisResult && (
               <div className="mt-4 p-4 bg-gray-50 rounded-md border border-gray-200">
                 <h4 className="text-sm font-medium text-gray-900 mb-2 flex items-center">
@@ -1037,7 +1018,6 @@ export const AddWork = () => {
               </div>
             )}
 
-            {/* 送信ボタン */}
             <div className="pt-5">
               <div className="flex justify-end">
                 <button
