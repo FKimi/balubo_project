@@ -4,22 +4,40 @@ const { createClient } = require('@supabase/supabase-js');
 const fetch = require('node-fetch');
 
 exports.handler = async function(event, context) {
+  // CORSヘッダーを設定
+  const headers = {
+    'Access-Control-Allow-Origin': '*', // 本番環境では 'https://balubo.netlify.app' などの特定ドメインに制限することを推奨
+    'Access-Control-Allow-Headers': 'Content-Type, Authorization',
+    'Access-Control-Allow-Methods': 'GET, POST, PUT, DELETE, OPTIONS'
+  };
+
+  // OPTIONSリクエスト（プリフライトリクエスト）への対応
+  if (event.httpMethod === 'OPTIONS') {
+    return {
+      statusCode: 200,
+      headers,
+      body: ''
+    };
+  }
+
   try {
-    // 環境変数からSupabase設定を取得
-    const supabaseUrl = process.env.SUPABASE_URL;
-    const supabaseServiceKey = process.env.SUPABASE_SERVICE_ROLE_KEY;
-    const geminiApiKey = process.env.GEMINI_API_KEY;
+    // 環境変数からSupabase設定を取得（複数の方法で試行）
+    const supabaseUrl = process.env.SUPABASE_URL || process.env.VITE_SUPABASE_URL || process.env.NEXT_SUPABASE_URL;
+    const supabaseServiceKey = process.env.SUPABASE_SERVICE_ROLE_KEY || process.env.VITE_SUPABASE_SERVICE_ROLE_KEY;
+    let geminiApiKey = process.env.GEMINI_API_KEY || process.env.VITE_GEMINI_API_KEY;
     
     console.log('環境変数の詳細情報:');
     console.log('SUPABASE_URL:', supabaseUrl ? '設定済み' : '未設定');
     console.log('SUPABASE_SERVICE_ROLE_KEY:', supabaseServiceKey ? '設定済み (最初の10文字: ' + supabaseServiceKey.substring(0, 10) + '...)' : '未設定');
-    console.log('GEMINI_API_KEY 設定状況:', geminiApiKey ? '設定済み' : '未設定');
+    console.log('GEMINI_API_KEY 設定状況:', geminiApiKey ? '設定済み (最初の10文字: ' + geminiApiKey.substring(0, 10) + '...)' : '未設定');
+    console.log('環境変数一覧:', Object.keys(process.env).join(', '));
     
     // 環境変数が設定されているか確認
     if (!supabaseUrl || !supabaseServiceKey) {
       console.error('Supabase環境変数が設定されていません');
       return {
         statusCode: 500,
+        headers,
         body: JSON.stringify({ 
           error: 'Supabase環境変数が設定されていません',
           details: {
@@ -50,6 +68,7 @@ exports.handler = async function(event, context) {
       console.error('Supabase接続テストに失敗:', testError);
       return {
         statusCode: 500,
+        headers,
         body: JSON.stringify({ 
           error: `Supabase接続テストに失敗: ${testError.message}`,
           details: testError
@@ -70,6 +89,7 @@ exports.handler = async function(event, context) {
       console.error('リクエストボディの解析に失敗:', error);
       return {
         statusCode: 400,
+        headers,
         body: JSON.stringify({ error: 'リクエストボディの解析に失敗しました' })
       };
     }
@@ -81,6 +101,7 @@ exports.handler = async function(event, context) {
       console.error('ユーザーIDが指定されていません');
       return {
         statusCode: 400,
+        headers,
         body: JSON.stringify({ error: 'ユーザーIDは必須です' })
       };
     }
@@ -98,6 +119,7 @@ exports.handler = async function(event, context) {
       console.error('ユーザー作品の取得中にエラーが発生しました:', worksError);
       return {
         statusCode: 500,
+        headers,
         body: JSON.stringify({ 
           error: `ユーザー作品の取得中にエラーが発生しました: ${worksError.message}`,
           details: worksError
@@ -109,6 +131,7 @@ exports.handler = async function(event, context) {
       console.log(`ユーザー ${userId} の作品が見つかりませんでした`);
       return {
         statusCode: 404,
+        headers,
         body: JSON.stringify({ error: 'No works found for this user' })
       };
     }
@@ -128,6 +151,7 @@ exports.handler = async function(event, context) {
       console.error('作品タグの取得中にエラーが発生しました:', workTagsError);
       return {
         statusCode: 500,
+        headers,
         body: JSON.stringify({ 
           error: `作品タグの取得中にエラーが発生しました: ${workTagsError.message}`,
           details: workTagsError
@@ -139,6 +163,7 @@ exports.handler = async function(event, context) {
       console.log('ユーザーの作品にタグが見つかりませんでした');
       return {
         statusCode: 404,
+        headers,
         body: JSON.stringify({ 
           error: 'No tags found for this user\'s works',
           message: 'タグが見つかりませんでした。作品にタグを追加してから再度お試しください。'
@@ -160,6 +185,7 @@ exports.handler = async function(event, context) {
       console.error('タグ情報の取得中にエラーが発生しました:', tagsError);
       return {
         statusCode: 500,
+        headers,
         body: JSON.stringify({ 
           error: `タグ情報の取得中にエラーが発生しました: ${tagsError.message}`,
           details: tagsError
@@ -194,6 +220,7 @@ exports.handler = async function(event, context) {
       console.error('ユーザー作品の取得中にエラーが発生しました:', worksDataError);
       return {
         statusCode: 500,
+        headers,
         body: JSON.stringify({ 
           error: `ユーザー作品の取得中にエラーが発生しました: ${worksDataError.message}`,
           details: worksDataError
@@ -205,6 +232,7 @@ exports.handler = async function(event, context) {
       console.log(`ユーザー ${userId} の作品が見つかりませんでした`);
       return {
         statusCode: 404,
+        headers,
         body: JSON.stringify({ error: 'No works found for this user' })
       };
     }
@@ -240,17 +268,23 @@ ${userWorksData.map(work => `タイトル: ${work.title}\n説明: ${work.descrip
 
     // Gemini APIキーが設定されているか確認
     if (!geminiApiKey) {
-      console.error('GEMINI_API_KEYが設定されていません');
-      return {
-        statusCode: 500,
-        body: JSON.stringify({ error: 'GEMINI_API_KEYが設定されていません' })
-      };
+      console.error('GEMINI_API_KEYが設定されていません - ハードコードされた値を使用します（開発環境のみ）');
+      // 開発環境用のフォールバック値（本番環境では使用しないでください）
+      if (process.env.NODE_ENV === 'development' || !process.env.NODE_ENV) {
+        geminiApiKey = 'AIzaSyBiWIbXXRT0wDqHl8VdChfLmmBN_VKuseQ';
+      } else {
+        return {
+          statusCode: 500,
+          headers,
+          body: JSON.stringify({ error: 'GEMINI_API_KEYが設定されていません' })
+        };
+      }
     }
 
     // Gemini APIを呼び出して分析
     console.log('Gemini APIを呼び出して分析中...');
     const geminiResponse = await fetch(
-      'https://generativelanguage.googleapis.com/v1/models/gemini-1.5-flash:generateContent?key=' + geminiApiKey,
+      'https://generativelanguage.googleapis.com/v1/models/gemini-pro-2:generateContent?key=' + geminiApiKey,
       {
         method: 'POST',
         headers: {
@@ -277,8 +311,13 @@ ${userWorksData.map(work => `タイトル: ${work.title}\n説明: ${work.descrip
     if (!geminiResponse.ok) {
       const errorText = await geminiResponse.text();
       console.error('Gemini APIの呼び出しに失敗:', errorText);
+      console.error('Gemini APIステータス:', geminiResponse.status, geminiResponse.statusText);
+      console.error('Gemini API URL:', 'https://generativelanguage.googleapis.com/v1/models/gemini-pro-2:generateContent');
+      console.error('Gemini APIキーの長さ:', geminiApiKey ? geminiApiKey.length : 0);
+      
       return {
         statusCode: 500,
+        headers,
         body: JSON.stringify({ 
           error: `Gemini APIの呼び出しに失敗: ${geminiResponse.status} ${geminiResponse.statusText}`,
           details: errorText
@@ -293,6 +332,7 @@ ${userWorksData.map(work => `タイトル: ${work.title}\n説明: ${work.descrip
       console.error('Gemini APIからの応答が空です');
       return {
         statusCode: 500,
+        headers,
         body: JSON.stringify({ error: 'Gemini APIからの応答が空です' })
       };
     }
@@ -392,6 +432,7 @@ ${userWorksData.map(work => `タイトル: ${work.title}\n説明: ${work.descrip
     // 分析結果を返す
     return {
       statusCode: 200,
+      headers,
       body: JSON.stringify({
         message: '分析が完了しました',
         data: {
@@ -428,6 +469,7 @@ ${userWorksData.map(work => `タイトル: ${work.title}\n説明: ${work.descrip
     
     return {
       statusCode: 500,
+      headers,
       body: JSON.stringify({ 
         error: `予期せぬエラーが発生しました: ${error.message || '不明なエラー'}`,
         details: errorDetails
