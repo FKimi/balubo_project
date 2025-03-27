@@ -276,8 +276,13 @@ export function Profile() {
       <div className="bg-white shadow-sm">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
           <div className="flex justify-between h-16 items-center">
+            <h1 
+              onClick={() => navigate('/')} 
+              className="text-xl font-bold text-indigo-600 cursor-pointer hover:text-indigo-800 transition-colors"
+            >
+              Balubo
+            </h1>
             <div></div>
-            <h1 className="text-xl font-bold text-indigo-600">Balubo</h1>
           </div>
         </div>
       </div>
