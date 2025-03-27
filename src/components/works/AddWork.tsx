@@ -12,6 +12,7 @@ interface ContentInput {
   title: string;
   description?: string | null;
   url?: string;
+  imageUrl?: string;
 }
 
 // AI分析結果の型定義
@@ -65,7 +66,7 @@ export const AddWork = () => {
   const [error, setError] = useState<string | null>(null);
   const [fetchingUrl, setFetchingUrl] = useState(false);
   const [analyzingContent, setAnalyzingContent] = useState(false);
-  const [generatedTags, setGeneratedTags] = useState<Array<{ name: string; relevance?: number }>>([]);
+  const [generatedTags, setGeneratedTags] = useState<string[]>([]);
   const [analysisResult, setAnalysisResult] = useState<AnalysisResult | null>(null);
   const urlFetchTimerRef = useRef<NodeJS.Timeout | null>(null);
   const [tagInput, setTagInput] = useState('');
@@ -230,76 +231,59 @@ export const AddWork = () => {
   };
 
   const handleAiAnalysis = async () => {
-    if (!form.title && !form.description) {
-      setError('タイトルまたは説明文を入力してください');
+    // 分析対象がない場合はエラー
+    if (!form.title && !form.description && !form.image_preview && !form.thumbnail_url) {
+      setError('タイトル、説明文、または画像のいずれかが必要です');
       return;
     }
-
-    setAnalyzingContent(true);
-    setError(null);
-
+    
     try {
+      setAnalyzingContent(true);
+      
+      // 分析対象のコンテンツを準備
       const content: ContentInput = {
-        title: form.title,
-        description: form.description,
-        url: form.source_url
+        title: form.title || '無題の作品', // タイトルがない場合はデフォルト値を設定
+        description: form.description || '', // 説明文がない場合は空文字
+        url: form.source_url || '',
+        imageUrl: form.image_preview || form.thumbnail_url // 画像URLを追加
       };
-
+      
+      console.log('AI分析を開始します:', content);
+      
+      // Gemini APIを使用して分析
       const result = await analyzeContent(content);
       console.log('AI分析結果:', result);
 
+      // 分析結果を設定
       setAnalysisResult(result);
       
+      // 生成されたタグを設定
       if (result.interests && result.interests.tags) {
-        const newTags = result.interests.tags.map(tag => {
-          let japaneseTag = tag;
-          
-          const tagTranslations: Record<string, string> = {
-            "Regional Revitalization": "地域活性化",
-            "Local Economy": "地域経済",
-            "Business Attraction": "企業誘致",
-            "Job Creation": "雇用創出",
-            "Investment": "投資",
-            "Innovation": "イノベーション",
-            "Community Development": "コミュニティ開発",
-            "Ehime Prefecture": "愛媛県",
-            "Japan": "日本",
-            "Rural Development": "地方開発",
-            "Economic Growth": "経済成長",
-            "Sustainability": "持続可能性",
-            "Technology": "テクノロジー",
-            "Tourism": "観光",
-            "Agriculture": "農業",
-            "Education": "教育",
-            "Healthcare": "医療",
-            "Infrastructure": "インフラ",
-            "Government": "行政",
-            "Policy": "政策"
-          };
-          
-          if (tagTranslations[tag]) {
-            japaneseTag = tagTranslations[tag];
-          }
-          
-          return {
-            name: japaneseTag,
-            relevance: 1.0
-          };
-        });
+        const newTags = result.interests.tags;
+        
         setGeneratedTags(newTags);
+        setForm(prev => ({ ...prev, tags: [...new Set([...prev.tags, ...newTags])] }));
+        
+        // 画像のみで分析した場合は、分析結果からタイトルを設定
+        if (!form.title && result.expertise && result.expertise.categories && result.expertise.categories.length > 0) {
+          const topCategory = result.expertise.categories[0].name;
+          setForm(prev => ({ 
+            ...prev, 
+            title: `${topCategory}の作品` 
+          }));
+        }
       }
     } catch (error) {
-      console.error('AI分析エラー:', error instanceof Error ? error.message : String(error));
+      console.error('AI分析エラー:', error);
       
       let errorMessage = 'AI分析中にエラーが発生しました。しばらく待ってから再試行してください。';
       
+      // エラーの種類に応じたメッセージ
       if (error instanceof Error) {
         if (error.message.includes("API key")) {
           errorMessage = "API keyが設定されていないか無効です。環境変数を確認してください。";
-        } else if (error.message.includes("network") || error.message.includes("timeout")) {
-          errorMessage = "ネットワークエラーが発生しました。インターネット接続を確認してください。";
-        } else if (error.message.includes("JSON")) {
-          errorMessage = "AIからの応答を解析できませんでした。しばらく待ってから再試行してください。";
+        } else if (error.message.includes("quota")) {
+          errorMessage = "API使用量の上限に達しました。後でもう一度お試しください。";
         }
       }
       
@@ -451,7 +435,7 @@ export const AddWork = () => {
       }
       
       let uploadedImageUrl = null;
-      if (selectedType === 'design' && form.image_file) {
+      if (form.image_file) {
         uploadedImageUrl = await uploadImage();
         if (!uploadedImageUrl) {
           setError('画像のアップロードに失敗しました');
@@ -528,16 +512,29 @@ export const AddWork = () => {
             if (existingTags && existingTags.length > 0) {
               const tagId = existingTags[0].id;
               
-              const { error: relationError } = await supabase
+              // タグの関連付けが既に存在するか確認
+              const { data: existingRelation } = await supabase
                 .from('work_tags')
-                .insert([{ 
-                  work_id: savedWorkId, 
-                  tag_id: tagId,
-                  created_at: new Date().toISOString()
-                }]);
+                .select('*')
+                .eq('work_id', savedWorkId)
+                .eq('tag_id', tagId)
+                .limit(1);
+                
+              // 関連付けが存在しない場合のみ挿入
+              if (!existingRelation || existingRelation.length === 0) {
+                const { error: relationError } = await supabase
+                  .from('work_tags')
+                  .insert([{ 
+                    work_id: savedWorkId, 
+                    tag_id: tagId,
+                    created_at: new Date().toISOString()
+                  }]);
 
-              if (relationError) {
-                console.error('タグの関連付けに失敗しました:', relationError);
+                if (relationError) {
+                  console.error('タグの関連付けに失敗しました:', relationError);
+                }
+              } else {
+                console.log(`タグ "${tagName}" は既に作品に関連付けられています`);
               }
             } else {
               try {
@@ -552,16 +549,29 @@ export const AddWork = () => {
                 
                 console.log(`タグ "${tagName}" を作成しました:`, newTag);
                 
-                const { error: relationError } = await supabase
+                // 新しいタグの関連付けが既に存在するか確認（念のため）
+                const { data: existingRelation } = await supabase
                   .from('work_tags')
-                  .insert([{ 
-                    work_id: savedWorkId, 
-                    tag_id: newTag.id,
-                    created_at: new Date().toISOString()
-                  }]);
-                
-                if (relationError) {
-                  console.error('新しいタグの関連付けに失敗しました:', relationError);
+                  .select('*')
+                  .eq('work_id', savedWorkId)
+                  .eq('tag_id', newTag.id)
+                  .limit(1);
+                  
+                // 関連付けが存在しない場合のみ挿入
+                if (!existingRelation || existingRelation.length === 0) {
+                  const { error: relationError } = await supabase
+                    .from('work_tags')
+                    .insert([{ 
+                      work_id: savedWorkId, 
+                      tag_id: newTag.id,
+                      created_at: new Date().toISOString()
+                    }]);
+                  
+                  if (relationError) {
+                    console.error('新しいタグの関連付けに失敗しました:', relationError);
+                  }
+                } else {
+                  console.log(`新しいタグ "${tagName}" は既に作品に関連付けられています`);
                 }
               } catch (error) {
                 console.error(`タグ "${tagName}" の作成に失敗しました:`, error);
@@ -635,6 +645,7 @@ export const AddWork = () => {
 
         <form id="work-form" onSubmit={handleSubmit} className="space-y-6">
           <div className="bg-white shadow rounded-lg p-6">
+            {/* 作品タイプ選択 */}
             <div className="grid grid-cols-2 gap-4 mb-6">
               <button
                 type="button"
@@ -665,11 +676,12 @@ export const AddWork = () => {
                   <ImageIcon className={`w-6 h-6 ${selectedType === 'design' ? 'text-indigo-600' : 'text-gray-400'}`} />
                 </div>
                 <span className={`text-sm font-medium ${selectedType === 'design' ? 'text-indigo-600' : 'text-gray-900'}`}>
-                  デザイン
+                  画像 & ファイル
                 </span>
               </button>
             </div>
 
+            {/* 共通フィールド：タイトル */}
             <div className="mb-4">
               <label htmlFor="title" className="block text-sm font-medium text-gray-700 mb-1">
                 タイトル
@@ -686,95 +698,100 @@ export const AddWork = () => {
               />
             </div>
 
+            {/* 記事・文章タイプの場合のみ表示するフィールド */}
             {selectedType === 'writing' && (
-              <div className="mb-4">
-                <label className="block text-sm font-medium text-gray-700 mb-1">
-                  作品URL
-                </label>
-                <div className="relative">
-                  <input
-                    type="url"
-                    value={form.source_url}
-                    onChange={(e) => handleUrlChange(e.target.value)}
-                    placeholder="https://example.com/your-work"
-                    className="block w-full rounded-md border-gray-300 shadow-sm focus:border-indigo-500 focus:ring-indigo-500 sm:text-sm pr-10"
-                  />
+              <>
+                <div className="mb-4">
+                  <label className="block text-sm font-medium text-gray-700 mb-1">
+                    作品URL
+                  </label>
+                  <div className="relative">
+                    <input
+                      type="url"
+                      value={form.source_url}
+                      onChange={(e) => handleUrlChange(e.target.value)}
+                      placeholder="https://example.com/your-work"
+                      className="block w-full rounded-md border-gray-300 shadow-sm focus:border-indigo-500 focus:ring-indigo-500 sm:text-sm pr-10"
+                    />
+                    {fetchingUrl && (
+                      <div className="absolute inset-y-0 right-0 flex items-center pr-3">
+                        <Loader2 className="h-4 w-4 text-gray-400 animate-spin" />
+                      </div>
+                    )}
+                  </div>
                   {fetchingUrl && (
-                    <div className="absolute inset-y-0 right-0 flex items-center pr-3">
-                      <Loader2 className="h-4 w-4 text-gray-400 animate-spin" />
+                    <p className="mt-1 text-xs text-gray-500">URLから情報を取得中...</p>
+                  )}
+                  {error && (
+                    <p className="mt-1 text-xs text-red-500">{error}</p>
+                  )}
+                </div>
+
+                {/* 記事・文章タイプの場合のサムネイル表示 */}
+                {form.thumbnail_url && (
+                  <div className="mb-4">
+                    <label className="block text-sm font-medium text-gray-700 mb-1">
+                      サムネイル画像
+                    </label>
+                    <div className="mt-1 relative rounded-md border border-gray-300 overflow-hidden">
+                      <img
+                        src={form.thumbnail_url}
+                        alt="サムネイル"
+                        className="w-full h-48 object-cover"
+                      />
+                    </div>
+                  </div>
+                )}
+              </>
+            )}
+
+            {/* 画像 & ファイルタイプの場合のみ表示するフィールド */}
+            {selectedType === 'design' && (
+              <>
+                {/* 画像アップロード */}
+                <div className="mb-4">
+                  <label className="block text-sm font-medium text-gray-700 mb-1">
+                    画像アップロード
+                  </label>
+                  <div className="flex justify-center">
+                    <input
+                      type="file"
+                      ref={fileInputRef}
+                      onChange={handleFileSelect}
+                      accept="image/*"
+                      className="hidden"
+                    />
+                    <button
+                      type="button"
+                      onClick={() => fileInputRef.current?.click()}
+                      className="inline-flex items-center px-3 py-2 border border-gray-300 rounded-md bg-gray-50 text-gray-500 hover:bg-gray-100"
+                    >
+                      <Camera className="h-4 w-4 mr-1" />
+                      画像を選択
+                    </button>
+                    {form.image_preview && (
+                      <button
+                        type="button"
+                        onClick={handleClearImage}
+                        className="inline-flex items-center px-3 py-2 border border-gray-300 rounded-md bg-gray-50 text-gray-500 hover:bg-gray-100 ml-2"
+                      >
+                        <Trash2 className="h-4 w-4 mr-1" />
+                        画像をクリア
+                      </button>
+                    )}
+                  </div>
+                  {form.image_preview && (
+                    <div className="mt-2">
+                      <img
+                        src={form.image_preview}
+                        alt="アップロード画像"
+                        className="w-full h-48 object-cover"
+                      />
                     </div>
                   )}
                 </div>
-                {fetchingUrl && (
-                  <p className="mt-1 text-xs text-gray-500">URLから情報を取得中...</p>
-                )}
-                {error && (
-                  <p className="mt-1 text-xs text-red-500">{error}</p>
-                )}
-              </div>
-            )}
 
-            {form.thumbnail_url && (
-              <div className="mb-4">
-                <label className="block text-sm font-medium text-gray-700 mb-1">
-                  サムネイル画像
-                </label>
-                <div className="mt-1 relative rounded-md border border-gray-300 overflow-hidden">
-                  <img
-                    src={form.thumbnail_url}
-                    alt="サムネイル"
-                    className="w-full h-48 object-cover"
-                  />
-                </div>
-              </div>
-            )}
-
-            {selectedType === 'design' && (
-              <div className="mb-4">
-                <label className="block text-sm font-medium text-gray-700 mb-1">
-                  画像アップロード
-                </label>
-                <div className="flex justify-center">
-                  <input
-                    type="file"
-                    ref={fileInputRef}
-                    onChange={handleFileSelect}
-                    accept="image/*"
-                    className="hidden"
-                  />
-                  <button
-                    type="button"
-                    onClick={() => fileInputRef.current?.click()}
-                    className="inline-flex items-center px-3 py-2 border border-gray-300 rounded-md bg-gray-50 text-gray-500 hover:bg-gray-100"
-                  >
-                    <Camera className="h-4 w-4 mr-1" />
-                    画像を選択
-                  </button>
-                  {form.image_preview && (
-                    <button
-                      type="button"
-                      onClick={handleClearImage}
-                      className="inline-flex items-center px-3 py-2 border border-gray-300 rounded-md bg-gray-50 text-gray-500 hover:bg-gray-100 ml-2"
-                    >
-                      <Trash2 className="h-4 w-4 mr-1" />
-                      画像をクリア
-                    </button>
-                  )}
-                </div>
-                {form.image_preview && (
-                  <div className="mt-2">
-                    <img
-                      src={form.image_preview}
-                      alt="アップロード画像"
-                      className="w-full h-48 object-cover"
-                    />
-                  </div>
-                )}
-              </div>
-            )}
-
-            {selectedType === 'design' && (
-              <>
+                {/* デザインタイプ選択 */}
                 <div className="mb-4">
                   <label htmlFor="design_type" className="block text-sm font-medium text-gray-700 mb-1">
                     デザインタイプ
@@ -795,6 +812,7 @@ export const AddWork = () => {
                   </select>
                 </div>
 
+                {/* デザイン関連URL */}
                 <div className="mb-4">
                   <label htmlFor="design_url" className="block text-sm font-medium text-gray-700 mb-1">
                     デザイン公開URL（任意）
@@ -809,6 +827,7 @@ export const AddWork = () => {
                   />
                 </div>
 
+                {/* Behance/Dribbble URL */}
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mb-4">
                   <div>
                     <label htmlFor="behance_url" className="block text-sm font-medium text-gray-700 mb-1">
@@ -840,6 +859,7 @@ export const AddWork = () => {
               </>
             )}
 
+            {/* 共通フィールド：説明文 */}
             <div className="mb-4">
               <label htmlFor="description" className="block text-sm font-medium text-gray-700 mb-1">
                 説明文
@@ -847,19 +867,19 @@ export const AddWork = () => {
               <textarea
                 id="description"
                 name="description"
-                rows={3}
+                rows={4}
                 value={form.description}
                 onChange={(e) => handleInputChange('description', e.target.value)}
                 className="block w-full rounded-md border-gray-300 shadow-sm focus:border-indigo-500 focus:ring-indigo-500 sm:text-sm"
-                placeholder="作品の説明を入力してください"
+                placeholder="作品の説明を入力"
               />
               <div className="flex justify-end mt-2">
                 <button
                   type="button"
                   onClick={handleAiAnalysis}
-                  disabled={analyzingContent || (!form.title && !form.description)}
+                  disabled={analyzingContent || ((!form.title && !form.description) && (!form.image_preview && !form.thumbnail_url))}
                   className={`text-sm px-3 py-1.5 rounded-md flex items-center
-                    ${analyzingContent || (!form.title && !form.description)
+                    ${analyzingContent || ((!form.title && !form.description) && (!form.image_preview && !form.thumbnail_url))
                       ? 'bg-gray-100 text-gray-500 cursor-not-allowed'
                       : 'bg-blue-100 hover:bg-blue-200 text-blue-700'
                     }`}
@@ -879,6 +899,7 @@ export const AddWork = () => {
               </div>
             </div>
 
+            {/* 共通フィールド：タグ */}
             <div className="mb-4">
               <label htmlFor="tag-input" className="block text-sm font-medium text-gray-700 mb-1">
                 タグ
@@ -948,16 +969,16 @@ export const AddWork = () => {
                         key={index}
                         type="button"
                         onClick={() => {
-                          if (!form.tags.includes(tag.name)) {
+                          if (!form.tags.includes(tag)) {
                             setForm({
                               ...form,
-                              tags: [...form.tags, tag.name]
+                              tags: [...form.tags, tag]
                             });
                           }
                         }}
                         className="inline-flex items-center px-2 py-0.5 rounded text-xs font-medium bg-gray-100 text-gray-800 hover:bg-gray-200"
                       >
-                        {tag.name}
+                        {tag}
                       </button>
                     ))}
                   </div>

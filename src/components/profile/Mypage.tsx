@@ -1412,7 +1412,7 @@ const Mypage: React.FC = () => {
                   <Star className="h-5 w-5 text-yellow-500 mr-2" />
                   <h4 className="text-md font-semibold">専門性</h4>
                 </div>
-                <p className="text-sm text-gray-600">{aiAnalysisResult?.expertise?.summary || "分析できます"}</p>
+                <p className="text-sm text-gray-600">{aiAnalysisResult?.expertise?.summary || "まだ分析されていません"}</p>
                 {aiAnalysisResult?.specialties && aiAnalysisResult.specialties.length > 0 && (
                   <div className="mt-2 flex flex-wrap gap-1">
                     {aiAnalysisResult.specialties.map((specialty, index) => (
@@ -1433,7 +1433,7 @@ const Mypage: React.FC = () => {
                   <Brush className="h-5 w-5 text-orange-500 mr-2" />
                   <h4 className="text-md font-semibold">コンテンツスタイル</h4>
                 </div>
-                <p className="text-sm text-gray-600">{aiAnalysisResult?.content_style?.summary || "分析できます"}</p>
+                <p className="text-sm text-gray-600">{aiAnalysisResult?.content_style?.summary || "まだ分析されていません"}</p>
                 {aiAnalysisResult?.design_styles && aiAnalysisResult.design_styles.length > 0 && (
                   <div className="mt-2 flex flex-wrap gap-1">
                     {aiAnalysisResult.design_styles.map((style, index) => (
@@ -1454,7 +1454,7 @@ const Mypage: React.FC = () => {
                   <Compass className="h-5 w-5 text-indigo-500 mr-2" />
                   <h4 className="text-md font-semibold">作品のユニークさ</h4>
                 </div>
-                <p className="text-sm text-gray-600">{aiAnalysisResult?.uniqueness?.summary || "分析できます"}</p>
+                <p className="text-sm text-gray-600">{aiAnalysisResult?.uniqueness?.summary || "まだ分析されていません"}</p>
                 {aiAnalysisResult?.interests?.areas && aiAnalysisResult.interests.areas.length > 0 && (
                   <div className="mt-2 flex flex-wrap gap-1">
                     {aiAnalysisResult.interests.areas.map((interest, index) => (

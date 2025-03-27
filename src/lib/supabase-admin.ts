@@ -483,19 +483,139 @@ export const fetchRelatedWorksWithAdmin = async (userId: string, currentWorkId: 
   try {
     console.log('管理者権限で関連作品データを取得:', userId, currentWorkId);
     
-    const { data, error } = await supabaseAdmin
-      .from('works')
-      .select('*')
-      .eq('user_id', userId)
-      .neq('id', currentWorkId)
-      .limit(limit);
+    // まず現在の作品のタグを取得
+    const { data: tagData, error: tagError } = await supabaseAdmin
+      .from('work_tags')
+      .select('tag_id')
+      .eq('work_id', currentWorkId);
       
-    if (error) {
-      console.error('管理者権限での関連作品取得エラー:', handleAdminError(error));
-      return { data: [], error: handleAdminError(error) };
+    if (tagError) {
+      console.error('管理者権限での作品タグ取得エラー:', handleAdminError(tagError));
+      // タグが取得できない場合は従来通り同じユーザーの作品を返す
+      const { data, error } = await supabaseAdmin
+        .from('works')
+        .select('*')
+        .eq('user_id', userId)
+        .neq('id', currentWorkId)
+        .limit(limit);
+        
+      if (error) {
+        console.error('管理者権限での関連作品取得エラー:', handleAdminError(error));
+        return { data: [], error: handleAdminError(error) };
+      }
+      
+      return { data: data || [], error: null };
     }
     
-    return { data: data || [], error: null };
+    // タグIDのリストを作成
+    const tagIds = tagData.map(tag => tag.tag_id);
+    
+    if (tagIds.length === 0) {
+      // タグがない場合は従来通り同じユーザーの作品を返す
+      const { data, error } = await supabaseAdmin
+        .from('works')
+        .select('*')
+        .eq('user_id', userId)
+        .neq('id', currentWorkId)
+        .limit(limit);
+        
+      if (error) {
+        console.error('管理者権限での関連作品取得エラー:', handleAdminError(error));
+        return { data: [], error: handleAdminError(error) };
+      }
+      
+      return { data: data || [], error: null };
+    }
+    
+    // タグに基づいて関連作品を検索
+    // 1. 同じタグを持つ作品IDを取得
+    const { data: relatedWorkIds, error: relatedError } = await supabaseAdmin
+      .from('work_tags')
+      .select('work_id')
+      .in('tag_id', tagIds)
+      .neq('work_id', currentWorkId);
+      
+    if (relatedError) {
+      console.error('管理者権限での関連タグ作品取得エラー:', handleAdminError(relatedError));
+      // エラーの場合は従来通り同じユーザーの作品を返す
+      const { data, error } = await supabaseAdmin
+        .from('works')
+        .select('*')
+        .eq('user_id', userId)
+        .neq('id', currentWorkId)
+        .limit(limit);
+        
+      if (error) {
+        console.error('管理者権限での関連作品取得エラー:', handleAdminError(error));
+        return { data: [], error: handleAdminError(error) };
+      }
+      
+      return { data: data || [], error: null };
+    }
+    
+    // 重複を除去して作品IDのリストを作成
+    const uniqueWorkIds = [...new Set(relatedWorkIds.map(item => item.work_id))];
+    
+    // 関連作品が見つからない場合は従来通り同じユーザーの作品を返す
+    if (uniqueWorkIds.length === 0) {
+      const { data, error } = await supabaseAdmin
+        .from('works')
+        .select('*')
+        .eq('user_id', userId)
+        .neq('id', currentWorkId)
+        .limit(limit);
+        
+      if (error) {
+        console.error('管理者権限での関連作品取得エラー:', handleAdminError(error));
+        return { data: [], error: handleAdminError(error) };
+      }
+      
+      return { data: data || [], error: null };
+    }
+    
+    // 2. 作品IDに基づいて作品データを取得
+    const { data: relatedWorks, error: worksError } = await supabaseAdmin
+      .from('works')
+      .select('*')
+      .in('id', uniqueWorkIds)
+      .limit(limit);
+      
+    if (worksError) {
+      console.error('管理者権限での関連作品データ取得エラー:', handleAdminError(worksError));
+      // エラーの場合は従来通り同じユーザーの作品を返す
+      const { data, error } = await supabaseAdmin
+        .from('works')
+        .select('*')
+        .eq('user_id', userId)
+        .neq('id', currentWorkId)
+        .limit(limit);
+        
+      if (error) {
+        console.error('管理者権限での関連作品取得エラー:', handleAdminError(error));
+        return { data: [], error: handleAdminError(error) };
+      }
+      
+      return { data: data || [], error: null };
+    }
+    
+    // 関連作品が少ない場合は、同じユーザーの他の作品で補完
+    if (relatedWorks.length < limit) {
+      const remainingLimit = limit - relatedWorks.length;
+      const existingIds = [...relatedWorks.map(work => work.id), currentWorkId];
+      
+      const { data: additionalWorks, error: additionalError } = await supabaseAdmin
+        .from('works')
+        .select('*')
+        .eq('user_id', userId)
+        .not('id', 'in', `(${existingIds.join(',')})`)
+        .limit(remainingLimit);
+        
+      if (!additionalError && additionalWorks) {
+        return { data: [...relatedWorks, ...additionalWorks], error: null };
+      }
+    }
+    
+    return { data: relatedWorks || [], error: null };
   } catch (err) {
     console.error('管理者権限での関連作品取得例外:', err);
     return { data: [], error: err };

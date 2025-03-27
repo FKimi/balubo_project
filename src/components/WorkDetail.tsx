@@ -210,11 +210,11 @@ const WorkDetail = () => {
       {/* 作品情報 */}
       <div className="bg-white rounded-lg shadow-md overflow-hidden mb-8">
         {work.thumbnail_url && (
-          <div className="w-full h-64 bg-gray-100">
+          <div className="w-full bg-gray-100 flex justify-center">
             <img 
               src={work.thumbnail_url} 
               alt={work.title} 
-              className="w-full h-full object-cover"
+              className="max-w-full max-h-[600px] object-contain"
             />
           </div>
         )}
@@ -342,10 +342,23 @@ const WorkDetail = () => {
                       {relatedWork.title}
                     </h3>
                     {relatedWork.description && (
-                      <p className="text-gray-600 text-sm line-clamp-2">
+                      <p className="text-gray-600 text-sm line-clamp-2 mb-2">
                         {relatedWork.description}
                       </p>
                     )}
+                    {/* 関連作品のタグを表示 */}
+                    <div className="flex flex-wrap mt-2">
+                      {relatedWork.tags && relatedWork.tags.length > 0 && 
+                        relatedWork.tags.map((tag, idx) => (
+                          <span 
+                            key={idx} 
+                            className="inline-flex items-center px-2 py-1 mr-1 mb-1 text-xs font-medium rounded-md bg-gray-100 text-gray-800"
+                          >
+                            {tag}
+                          </span>
+                        ))
+                      }
+                    </div>
                   </div>
                 </div>
               ))}

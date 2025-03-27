@@ -71,6 +71,7 @@ export function SignUpForm() {
       if (error) throw error;
       
       // Google認証はリダイレクトするため、ここではnavigateは不要
+      // 認証後はAuthCallbackコンポーネントで/mypageに自動的にリダイレクトされます
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Googleログイン中にエラーが発生しました');
       setGoogleLoading(false);
