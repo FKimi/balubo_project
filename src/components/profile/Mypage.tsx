@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useCallback } from 'react';
+import React, { useState, useEffect, useCallback, useRef } from 'react';
 import { useNavigate, useParams } from 'react-router-dom';
 import { supabase } from '../../lib/supabase';
 import { useToast } from '../../lib/hooks/useToast';
@@ -13,7 +13,9 @@ import {
   Brush,
   Compass,
   AlertCircle,
-  LogOut
+  LogOut,
+  FileType,
+  Image
 } from 'lucide-react';
 import { 
   AreaChart, 
@@ -135,6 +137,8 @@ const Mypage: React.FC = () => {
   const [isCurrentPosition, setIsCurrentPosition] = useState(false);
   const [showShareUrl, setShowShareUrl] = useState(false);
   const [isCurrentUser, setIsCurrentUser] = useState(false);
+  const [showAddWorkMenu, setShowAddWorkMenu] = useState(false); 
+  const addWorkButtonRef = useRef<HTMLDivElement>(null); 
   const toast = useToast();
   const navigate = useNavigate();
   const params = useParams();
@@ -1062,6 +1066,33 @@ const Mypage: React.FC = () => {
     };
   }, [fetchUserProfile]);
 
+  // 作品追加メニューの表示・非表示を切り替える
+  const toggleAddWorkMenu = (e: React.MouseEvent) => {
+    e.preventDefault();
+    e.stopPropagation();
+    setShowAddWorkMenu(prev => !prev);
+  };
+
+  // 外部クリックでメニューを閉じる
+  useEffect(() => {
+    const handleClickOutside = (event: MouseEvent) => {
+      if (addWorkButtonRef.current && !addWorkButtonRef.current.contains(event.target as Node)) {
+        setShowAddWorkMenu(false);
+      }
+    };
+
+    document.addEventListener('mousedown', handleClickOutside);
+    return () => {
+      document.removeEventListener('mousedown', handleClickOutside);
+    };
+  }, []);
+
+  // 作品タイプを選択して作品追加ページに遷移
+  const handleAddWorkType = (type: string) => {
+    navigate(`/works/new?type=${type}`);
+    setShowAddWorkMenu(false);
+  };
+
   return (
     <div className="min-h-screen bg-gray-50">
       {/* ローディング表示 */}
@@ -1084,13 +1115,46 @@ const Mypage: React.FC = () => {
               </div>
             </div>
             <div className="flex items-center space-x-4">
-              <a
-                href="/works/new"
-                className="inline-flex items-center px-4 py-2 border border-transparent text-sm font-medium rounded-md shadow-sm text-white bg-indigo-600 hover:bg-indigo-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-indigo-500"
-              >
-                <PlusCircle className="mr-2 h-4 w-4" />
-                作品を追加
-              </a>
+              <div ref={addWorkButtonRef} className="relative inline-block text-left">
+                <button
+                  onClick={toggleAddWorkMenu}
+                  className="inline-flex items-center px-3 py-2 border border-gray-300 shadow-sm text-sm font-medium rounded-md text-gray-700 bg-white hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-indigo-500"
+                  aria-label="作品を追加"
+                >
+                  <PlusCircle className="mr-2 h-4 w-4" />
+                  作品を追加
+                </button>
+                {showAddWorkMenu && (
+                  <div className="origin-top-right absolute right-0 mt-2 w-56 rounded-md shadow-lg bg-white ring-1 ring-black ring-opacity-5 focus:outline-none z-10">
+                    <div className="py-1">
+                      <button
+                        onClick={() => handleAddWorkType('writing')}
+                        className="flex items-center w-full px-4 py-3 text-sm text-gray-700 hover:bg-gray-100 hover:text-gray-900"
+                      >
+                        <div className="w-8 h-8 bg-green-100 rounded-full flex items-center justify-center mr-3">
+                          <FileType className="h-4 w-4 text-green-600" />
+                        </div>
+                        <div className="text-left">
+                          <span className="font-medium">ウェブ</span>
+                          <p className="text-xs text-gray-500">記事・ブログなど</p>
+                        </div>
+                      </button>
+                      <button
+                        onClick={() => handleAddWorkType('design')}
+                        className="flex items-center w-full px-4 py-3 text-sm text-gray-700 hover:bg-gray-100 hover:text-gray-900"
+                      >
+                        <div className="w-8 h-8 bg-yellow-100 rounded-full flex items-center justify-center mr-3">
+                          <Image className="h-4 w-4 text-yellow-600" />
+                        </div>
+                        <div className="text-left">
+                          <span className="font-medium">画像 & ファイル</span>
+                          <p className="text-xs text-gray-500">デザイン・写真など</p>
+                        </div>
+                      </button>
+                    </div>
+                  </div>
+                )}
+              </div>
               <button
                 onClick={handleLogout}
                 className="inline-flex items-center px-3 py-2 text-sm font-medium rounded-md text-gray-700 hover:text-gray-900 hover:bg-gray-100"
@@ -1352,7 +1416,10 @@ const Mypage: React.FC = () => {
                 {aiAnalysisResult?.specialties && aiAnalysisResult.specialties.length > 0 && (
                   <div className="mt-2 flex flex-wrap gap-1">
                     {aiAnalysisResult.specialties.map((specialty, index) => (
-                      <span key={index} className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-yellow-100 text-yellow-800">
+                      <span
+                        key={index}
+                        className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-yellow-100 text-yellow-800"
+                      >
                         {specialty}
                       </span>
                     ))}
@@ -1370,7 +1437,10 @@ const Mypage: React.FC = () => {
                 {aiAnalysisResult?.design_styles && aiAnalysisResult.design_styles.length > 0 && (
                   <div className="mt-2 flex flex-wrap gap-1">
                     {aiAnalysisResult.design_styles.map((style, index) => (
-                      <span key={index} className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-orange-100 text-orange-800">
+                      <span
+                        key={index}
+                        className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-orange-100 text-orange-800"
+                      >
                         {style}
                       </span>
                     ))}
@@ -1388,7 +1458,10 @@ const Mypage: React.FC = () => {
                 {aiAnalysisResult?.interests?.areas && aiAnalysisResult.interests.areas.length > 0 && (
                   <div className="mt-2 flex flex-wrap gap-1">
                     {aiAnalysisResult.interests.areas.map((interest, index) => (
-                      <span key={index} className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-indigo-100 text-indigo-800">
+                      <span
+                        key={index}
+                        className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-indigo-100 text-indigo-800"
+                      >
                         {interest}
                       </span>
                     ))}
@@ -1404,6 +1477,49 @@ const Mypage: React.FC = () => {
                 <p className="text-sm text-gray-500">
                   「作品を追加」ボタンをクリックして、最初の作品を追加しましょう
                 </p>
+                {isCurrentUser && (
+                  <div className="mt-4">
+                    <div className="relative inline-block text-left">
+                      <button
+                        onClick={toggleAddWorkMenu}
+                        className="inline-flex items-center px-4 py-2 border border-transparent text-sm font-medium rounded-md shadow-sm text-white bg-indigo-600 hover:bg-indigo-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-indigo-500"
+                      >
+                        <PlusCircle className="mr-2 h-4 w-4" />
+                        作品を追加
+                      </button>
+                      {showAddWorkMenu && (
+                        <div className="origin-top-right absolute right-0 mt-2 w-56 rounded-md shadow-lg bg-white ring-1 ring-black ring-opacity-5 focus:outline-none z-10">
+                          <div className="py-1">
+                            <button
+                              onClick={() => handleAddWorkType('writing')}
+                              className="flex items-center w-full px-4 py-3 text-sm text-gray-700 hover:bg-gray-100 hover:text-gray-900"
+                            >
+                              <div className="w-8 h-8 bg-green-100 rounded-full flex items-center justify-center mr-3">
+                                <FileType className="h-4 w-4 text-green-600" />
+                              </div>
+                              <div className="text-left">
+                                <span className="font-medium">ウェブ</span>
+                                <p className="text-xs text-gray-500">記事・ブログなど</p>
+                              </div>
+                            </button>
+                            <button
+                              onClick={() => handleAddWorkType('design')}
+                              className="flex items-center w-full px-4 py-3 text-sm text-gray-700 hover:bg-gray-100 hover:text-gray-900"
+                            >
+                              <div className="w-8 h-8 bg-yellow-100 rounded-full flex items-center justify-center mr-3">
+                                <Image className="h-4 w-4 text-yellow-600" />
+                              </div>
+                              <div className="text-left">
+                                <span className="font-medium">画像 & ファイル</span>
+                                <p className="text-xs text-gray-500">デザイン・写真など</p>
+                              </div>
+                            </button>
+                          </div>
+                        </div>
+                      )}
+                    </div>
+                  </div>
+                )}
               </div>
             </div>
           )}
@@ -1414,16 +1530,47 @@ const Mypage: React.FC = () => {
           <div className="flex justify-between items-center mb-4">
             <h2 className="text-xl font-bold">作品一覧</h2>
             {isCurrentUser && (
-              <a
-                href="/works/new"
-                className="inline-flex items-center px-3 py-2 border border-transparent text-sm font-medium rounded-md shadow-sm text-white bg-indigo-600 hover:bg-indigo-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-indigo-500"
-              >
-                <PlusCircle className="mr-2 h-4 w-4" />
-                作品を追加
-              </a>
+              <div ref={addWorkButtonRef} className="relative inline-block text-left">
+                <button
+                  onClick={toggleAddWorkMenu}
+                  className="inline-flex items-center px-3 py-2 border border-transparent text-sm font-medium rounded-md shadow-sm text-white bg-indigo-600 hover:bg-indigo-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-indigo-500"
+                >
+                  <PlusCircle className="mr-2 h-4 w-4" />
+                  作品を追加
+                </button>
+                {showAddWorkMenu && (
+                  <div className="origin-top-right absolute right-0 mt-2 w-56 rounded-md shadow-lg bg-white ring-1 ring-black ring-opacity-5 focus:outline-none z-10">
+                    <div className="py-1">
+                      <button
+                        onClick={() => handleAddWorkType('writing')}
+                        className="flex items-center w-full px-4 py-3 text-sm text-gray-700 hover:bg-gray-100 hover:text-gray-900"
+                      >
+                        <div className="w-8 h-8 bg-green-100 rounded-full flex items-center justify-center mr-3">
+                          <FileType className="h-4 w-4 text-green-600" />
+                        </div>
+                        <div className="text-left">
+                          <span className="font-medium">ウェブ</span>
+                          <p className="text-xs text-gray-500">記事・ブログなど</p>
+                        </div>
+                      </button>
+                      <button
+                        onClick={() => handleAddWorkType('design')}
+                        className="flex items-center w-full px-4 py-3 text-sm text-gray-700 hover:bg-gray-100 hover:text-gray-900"
+                      >
+                        <div className="w-8 h-8 bg-yellow-100 rounded-full flex items-center justify-center mr-3">
+                          <Image className="h-4 w-4 text-yellow-600" />
+                        </div>
+                        <div className="text-left">
+                          <span className="font-medium">画像 & ファイル</span>
+                          <p className="text-xs text-gray-500">デザイン・写真など</p>
+                        </div>
+                      </button>
+                    </div>
+                  </div>
+                )}
+              </div>
             )}
           </div>
-
           {works.length > 0 ? (
             <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
               {works.map((work) => (
@@ -1467,7 +1614,6 @@ const Mypage: React.FC = () => {
                           className="text-gray-400"
                         >
                           <path d="M14.5 4h-5L7 7H4a2 2 0 0 0-2 2v9a2 2 0 0 0 2 2h16a2 2 0 0 0 2-2V9a2 2 0 0 0-2-2h-3l-2.5-3z" />
-                          <circle cx="12" cy="13" r="3" />
                         </svg>
                         <p className="mt-2 text-sm text-gray-500">No Image</p>
                       </div>
