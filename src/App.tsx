@@ -36,6 +36,31 @@ function LandingPage() {
 
   return (
     <div className="min-h-screen bg-gradient-to-b from-white to-gray-50">
+      {/* ヘッダー */}
+      <nav className="bg-white shadow-sm">
+        <div className="mx-auto max-w-7xl px-4 sm:px-6 lg:px-8">
+          <div className="flex justify-between h-16 items-center">
+            <div className="flex-shrink-0">
+              <span className="text-2xl font-bold text-indigo-600">Balubo</span>
+            </div>
+            <div className="flex items-center space-x-4">
+              <button
+                onClick={() => navigate('/login')}
+                className="text-gray-700 hover:text-indigo-600 px-3 py-2 rounded-md text-sm font-medium"
+              >
+                ログイン
+              </button>
+              <button
+                onClick={() => navigate('/signup')}
+                className="bg-indigo-600 hover:bg-indigo-500 text-white px-4 py-2 rounded-md text-sm font-medium"
+              >
+                無料で始める
+              </button>
+            </div>
+          </div>
+        </div>
+      </nav>
+
       {/* Hero Section */}
       <header className="container mx-auto px-4 py-16 sm:px-6 lg:px-8">
         <div className="text-center">
@@ -160,7 +185,7 @@ function LandingPage() {
                 </dt>
                 <dd className="mt-4 flex flex-auto flex-col text-base leading-7 text-gray-600">
                   <p className="flex-auto">
-                    Google Gemini APIを活用し、あなたの専門性、スタイル、興味関心を客観的に分析します。
+                    AIを活用し、あなたの専門性、スタイル、作品のユニークさを客観的に分析します。
                   </p>
                 </dd>
               </div>
@@ -219,11 +244,11 @@ function LandingPage() {
               <div className="flex flex-col">
                 <dt className="flex items-center gap-x-3 text-xl font-semibold leading-7 text-gray-900">
                   <LineChart className="h-6 w-6 flex-none text-indigo-600" aria-hidden="true" />
-                  興味関心分析
+                  作品のユニークさ分析
                 </dt>
                 <dd className="mt-4 flex flex-auto flex-col text-base leading-7 text-gray-600">
                   <p className="flex-auto">
-                    あなたが取り上げるテーマや題材から興味関心を分析。自分では気づかなかった傾向を発見できます。
+                    あなたが取り上げる題材から作品のユニークさを分析。自分では気づかなかった傾向を発見できます。
                   </p>
                 </dd>
               </div>
@@ -297,7 +322,7 @@ function LandingPage() {
               </div>
               <h3 className="text-xl font-semibold mb-2">AI分析実行</h3>
               <p className="text-gray-600">
-                AIがあなたの作品を自動分析。専門性、スタイル、興味関心などを客観的に可視化します。
+                AIがあなたの作品を自動分析。専門性、スタイル、作品のユニークさなどを客観的に可視化します。
               </p>
             </div>
           </div>
@@ -323,7 +348,7 @@ function LandingPage() {
                 <h3 className="text-xl font-semibold">データ保護</h3>
               </div>
               <p className="text-gray-600">
-                あなたの個人情報や作品データは厳重に保護されます。データは暗号化され、必要な場合にのみアクセスされます。詳細はプライバシーポリシーをご確認ください。
+                あなたの個人情報や作品データは厳重に保護されます。データは暗号化され、必要な場合にのみアクセスされます。
               </p>
             </div>
             
@@ -333,7 +358,7 @@ function LandingPage() {
                 <h3 className="text-xl font-semibold">高品質なAI分析</h3>
               </div>
               <p className="text-gray-600">
-                Google Gemini APIを使用した高精度な分析を提供。客観的かつ公平な評価を心がけ、あなたの真の価値を引き出します。
+                AIを使用した高精度な分析を提供。客観的かつ公平な評価を心がけ、あなたの真の価値を引き出します。
               </p>
             </div>
           </div>
@@ -389,7 +414,7 @@ function LandingPage() {
                   <ChevronDown className="h-5 w-5 text-gray-500" />
                 </div>
                 <div className="mt-2 text-gray-600">
-                  Google Gemini APIを使用した高精度な分析を提供。客観的かつ公平な評価を心がけ、あなたの真の価値を引き出します。
+                  AIを使用した高精度な分析を提供。客観的かつ公平な評価を心がけ、あなたの真の価値を引き出します。
                 </div>
               </div>
               
@@ -443,11 +468,6 @@ function LandingPage() {
             <div className="text-2xl font-bold text-indigo-600 mb-4">Balubo</div>
             <div className="text-sm text-gray-500 mb-6">
               AI分析型ポートフォリオサービス
-            </div>
-            <div className="flex space-x-6 mb-8">
-              <a href="#" className="text-gray-500 hover:text-indigo-600 transition-colors">利用規約</a>
-              <a href="#" className="text-gray-500 hover:text-indigo-600 transition-colors">プライバシーポリシー</a>
-              <a href="#" className="text-gray-500 hover:text-indigo-600 transition-colors">お問い合わせ</a>
             </div>
             <div className="text-sm text-gray-400">
               {new Date().getFullYear()} Balubo. All rights reserved.
