@@ -19,10 +19,10 @@ interface InsightItem {
 export async function saveUserInsights(
   userId: string,
   insights: {
-    expertise?: InsightItem;
-    uniqueness?: InsightItem;
-    interests?: InsightItem;
-    talent?: InsightItem;
+    originality?: InsightItem;
+    quality?: InsightItem;
+    engagement?: InsightItem;
+    content_style?: InsightItem;
     specialties?: string[];
     design_styles?: string[];
   }
@@ -47,10 +47,10 @@ export async function saveUserInsights(
       const { error: updateError } = await supabaseAdmin
         .from('user_insights')
         .update({
-          expertise: insights.expertise || null,
-          uniqueness: insights.uniqueness || null,
-          interests: insights.interests || null,
-          talent: insights.talent || null,
+          originality: insights.originality || null,
+          quality: insights.quality || null,
+          engagement: insights.engagement || null,
+          content_style: insights.content_style || null,
           specialties: insights.specialties || [],
           design_styles: insights.design_styles || [],
           updated_at: new Date().toISOString()
@@ -64,10 +64,10 @@ export async function saveUserInsights(
         .from('user_insights')
         .insert({
           user_id: userId,
-          expertise: insights.expertise || null,
-          uniqueness: insights.uniqueness || null,
-          interests: insights.interests || null,
-          talent: insights.talent || null,
+          originality: insights.originality || null,
+          quality: insights.quality || null,
+          engagement: insights.engagement || null,
+          content_style: insights.content_style || null,
           specialties: insights.specialties || [],
           design_styles: insights.design_styles || [],
           created_at: new Date().toISOString(),
@@ -99,9 +99,10 @@ export async function getUserInsightsApi(
 ): Promise<{ 
   success: boolean; 
   data?: { 
-    expertise: string[]; 
-    style: string[]; 
-    interests: string[]; 
+    originality: string[]; 
+    quality: string[]; 
+    engagement: string[]; 
+    content_style: string[]; 
   }; 
   error?: string 
 }> {
@@ -134,9 +135,10 @@ export async function getUserInsightsApi(
     return { 
       success: true, 
       data: {
-        expertise: data.specialties || [],
-        style: data.design_styles || [],
-        interests: data.interests?.areas || []
+        originality: data.originality?.topics || [],
+        quality: data.quality?.topics || [],
+        engagement: data.engagement?.topics || [],
+        content_style: data.content_style?.topics || []
       }
     };
   } catch (error) {

@@ -17,22 +17,19 @@ interface ContentInput {
 
 // AI分析結果の型定義
 interface AnalysisResult {
-  expertise: {
-    categories: Array<{ name: string; score: number }>;
-    summary: string;
-  };
-  content_style: {
+  originality: {
     features: Array<{ name: string; score: number }>;
     summary: string;
   };
-  interests: {
-    tags: string[];
+  quality: {
+    categories: Array<{ name: string; score: number }>;
     summary: string;
   };
-  appeal_points: {
+  engagement: {
     points: Array<{ title: string; description: string }>;
     summary: string;
   };
+  tags: string[];
 }
 
 interface WorkData {
@@ -258,18 +255,18 @@ export const AddWork = () => {
       setAnalysisResult(result);
       
       // 生成されたタグを設定
-      if (result.interests && result.interests.tags) {
-        const newTags = result.interests.tags;
+      if (result.tags) {
+        const newTags = result.tags;
         
         setGeneratedTags(newTags);
         setForm(prev => ({ ...prev, tags: [...new Set([...prev.tags, ...newTags])] }));
         
         // 画像のみで分析した場合は、分析結果からタイトルを設定
-        if (!form.title && result.expertise && result.expertise.categories && result.expertise.categories.length > 0) {
-          const topCategory = result.expertise.categories[0].name;
+        if (!form.title && result.originality && result.originality.features && result.originality.features.length > 0) {
+          const topFeature = result.originality.features[0].name;
           setForm(prev => ({ 
             ...prev, 
-            title: `${topCategory}の作品` 
+            title: `${topFeature}の作品` 
           }));
         }
       }
@@ -1010,52 +1007,104 @@ export const AddWork = () => {
             </div>
 
             {analysisResult && (
-              <div className="mt-4 p-4 bg-gray-50 rounded-md border border-gray-200">
-                <h4 className="text-sm font-medium text-gray-900 mb-2 flex items-center">
+              <div className="mt-4 p-4 bg-gray-50 rounded-md border border-gray-200" data-component-name="AddWork">
+                <h4 className="text-sm font-medium text-gray-900 mb-2 flex items-center" data-component-name="AddWork">
                   <BrainCircuit className="w-4 h-4 mr-1 text-indigo-500" />
                   AI分析結果
                 </h4>
                 
-                {analysisResult.expertise && (
-                  <div className="mb-2">
-                    <p className="text-xs font-medium text-gray-700">専門性:</p>
-                    <p className="text-sm text-gray-800">{analysisResult.expertise.summary}</p>
+                <div className="mb-3 text-xs text-gray-600 border-b pb-2">
+                  クリエイターの価値を測る要素は多様ですが、特に重要と考えられる以下の3つの要素から分析しています。これらの要素は相互に関連し合い、総合的に見ることであなたの多面的な価値や魅力をより深く理解できます。
+                </div>
+                
+                {analysisResult.originality && (
+                  <div className="mb-4">
+                    <p className="text-xs font-medium text-gray-700 mb-1" data-component-name="AddWork">創造性と独自性 (オリジナリティ):</p>
+                    <div className="mb-2">
+                      <p className="text-xs text-gray-600 mb-1">
+                        新しいアイデアや表現を生み出す能力、既存の概念を独自の視点で再解釈する力を指します。他者と差別化された独自の世界観や表現スタイルを確立することで、作品に唯一無二の価値が生まれます。
+                      </p>
+                      <ul className="text-xs text-gray-600 list-disc pl-4 mb-2">
+                        <li>新規性：これまでにない新しい視点や表現</li>
+                        <li>独創性：他者と明確に区別される独自の特徴</li>
+                        <li>革新性：既存の枠組みを超える挑戦的な試み</li>
+                      </ul>
+                    </div>
+                    <p className="text-sm text-gray-800 border-l-2 border-yellow-400 pl-2" data-component-name="AddWork">
+                      {analysisResult.originality.summary.length > 140 
+                        ? `${analysisResult.originality.summary.substring(0, 137)}...` 
+                        : analysisResult.originality.summary}
+                      <span className="block mt-1 text-xs text-indigo-600">今後、異なる分野の知識を組み合わせることで、さらに独自性を高める可能性があります。</span>
+                    </p>
                   </div>
                 )}
                 
-                {analysisResult.content_style && (
-                  <div className="mb-2">
-                    <p className="text-xs font-medium text-gray-700">コンテンツスタイル:</p>
-                    <p className="text-sm text-gray-800">{analysisResult.content_style.summary}</p>
+                {analysisResult.quality && (
+                  <div className="mb-4">
+                    <p className="text-xs font-medium text-gray-700 mb-1" data-component-name="AddWork">専門性とスキル (クオリティ):</p>
+                    <div className="mb-2">
+                      <p className="text-xs text-gray-600 mb-1">
+                        特定の分野における知識や技術の深さと幅を表します。専門的な知見に基づいた質の高い作品制作能力や、技術的な完成度の高さが作品の信頼性と価値を高めます。
+                      </p>
+                      <ul className="text-xs text-gray-600 list-disc pl-4 mb-2">
+                        <li>技術的完成度：作品の仕上がりや精度の高さ</li>
+                        <li>専門知識の深さ：特定分野における専門的な知見</li>
+                        <li>一貫性：作品全体を通じた質とスタイルの安定性</li>
+                      </ul>
+                    </div>
+                    <p className="text-sm text-gray-800 border-l-2 border-orange-400 pl-2" data-component-name="AddWork">
+                      {analysisResult.quality.summary.length > 140 
+                        ? `${analysisResult.quality.summary.substring(0, 137)}...` 
+                        : analysisResult.quality.summary}
+                      <span className="block mt-1 text-xs text-indigo-600">継続的な学習と実践により、さらにスキルを磨き、専門性を深めていくことができるでしょう。</span>
+                    </p>
                   </div>
                 )}
                 
-                {analysisResult.interests && analysisResult.interests.summary && (
-                  <div className="mb-2">
-                    <p className="text-xs font-medium text-gray-700">作品のユニークさ:</p>
-                    <p className="text-sm text-gray-800">{analysisResult.interests.summary}</p>
+                {analysisResult.engagement && analysisResult.engagement.summary && (
+                  <div className="mb-4">
+                    <p className="text-xs font-medium text-gray-700 mb-1">影響力と共感 (エンゲージメント):</p>
+                    <div className="mb-2">
+                      <p className="text-xs text-gray-600 mb-1">
+                        作品が他者に与える影響や共感を呼び起こす力を指します。感情を動かし、新たな視点や行動の変化を促す作品は、社会的価値や文化的意義を持ち、より広い影響力を持ちます。
+                      </p>
+                      <ul className="text-xs text-gray-600 list-disc pl-4 mb-2">
+                        <li>共感性：観客の感情や経験に響く力</li>
+                        <li>社会的影響力：社会的議論や変化を促す可能性</li>
+                        <li>記憶に残る度合い：長期的に記憶に残る印象の強さ</li>
+                      </ul>
+                    </div>
+                    <p className="text-sm text-gray-800 border-l-2 border-indigo-400 pl-2" data-component-name="AddWork">
+                      {analysisResult.engagement.summary && analysisResult.engagement.summary.length > 140 
+                        ? `${analysisResult.engagement.summary.substring(0, 137)}...` 
+                        : analysisResult.engagement.summary}
+                      <span className="block mt-1 text-xs text-indigo-600">多様な視点を取り入れ、ターゲットオーディエンスとの対話を深めることで、さらなる共感と影響力を生み出せるでしょう。</span>
+                    </p>
                   </div>
                 )}
+                
+                <div className="text-xs text-gray-600 border-t pt-2">
+                  <p>これらの要素を総合的に見ることで、あなたの作品やクリエイターとしての多面的な価値や魅力をより深く理解できます。あなたの創造性と情熱は、今後さらに多くの可能性を広げていくでしょう。</p>
+                </div>
               </div>
             )}
-
-            <div className="pt-5">
-              <div className="flex justify-end">
-                <button
-                  type="button"
-                  onClick={() => navigate('/mypage')}
-                  className="bg-white py-2 px-4 border border-gray-300 rounded-md shadow-sm text-sm font-medium text-gray-700 hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-indigo-500"
-                >
-                  キャンセル
-                </button>
-                <button
-                  type="submit"
-                  disabled={loading}
-                  className="ml-3 inline-flex justify-center py-2 px-4 border border-transparent shadow-sm text-sm font-medium rounded-md text-white bg-indigo-600 hover:bg-indigo-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-indigo-500 disabled:opacity-50 disabled:cursor-not-allowed"
-                >
-                  {loading ? '保存中...' : '保存'}
-                </button>
-              </div>
+          </div>
+          <div className="pt-5">
+            <div className="flex justify-end">
+              <button
+                type="button"
+                onClick={() => navigate('/mypage')}
+                className="bg-white py-2 px-4 border border-gray-300 rounded-md shadow-sm text-sm font-medium text-gray-700 hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-indigo-500"
+              >
+                キャンセル
+              </button>
+              <button
+                type="submit"
+                disabled={loading}
+                className="ml-3 inline-flex justify-center py-2 px-4 border border-transparent shadow-sm text-sm font-medium rounded-md text-white bg-indigo-600 hover:bg-indigo-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-indigo-500 disabled:opacity-50 disabled:cursor-not-allowed"
+              >
+                {loading ? '保存中...' : '保存'}
+              </button>
             </div>
           </div>
         </form>

@@ -40,11 +40,9 @@ interface Work {
 
 // AI分析結果の型定義
 interface AnalysisResult {
-  expertise: string;
-  content_style: string;
-  uniqueness: string;
-  interests: string;
-  appeal_points: string;
+  originality: string;
+  quality: string;
+  engagement: string;
 }
 
 const WorkDetail = () => {
@@ -251,7 +249,8 @@ const WorkDetail = () => {
         {isOwner && (
           <Button 
             onClick={() => setShowDeleteConfirm(true)} 
-            className="float-right ml-2"
+            className="float-right mr-4"
+            variant="destructive"
           >
             <Trash2 className="w-4 h-4 mr-2" />
             削除
@@ -260,14 +259,13 @@ const WorkDetail = () => {
         
         {showDeleteConfirm && (
           <div className="fixed inset-0 bg-gray-900 bg-opacity-50 flex justify-center items-center z-50">
-            <div className="bg-white rounded-lg shadow-md p-6 w-96">
-              <h2 className="text-lg font-bold text-gray-900 mb-4">作品を削除しますか?</h2>
-              <p className="text-gray-600 mb-6">作品を削除すると、作品データが完全に消去されます。この操作は元に戻せません。</p>
-              <div className="flex justify-end">
+            <div className="bg-white rounded-lg shadow-md p-6 w-96 max-w-[90%]">
+              <h2 className="text-xl font-bold text-center mb-6">本当に削除しますか？</h2>
+              <div className="flex justify-between">
                 <Button 
-                  variant="text" 
+                  variant="secondary" 
                   onClick={() => setShowDeleteConfirm(false)} 
-                  className="mr-2"
+                  className="w-[48%]"
                   disabled={deleting}
                 >
                   キャンセル
@@ -276,18 +274,14 @@ const WorkDetail = () => {
                   variant="destructive"
                   onClick={handleDeleteWork} 
                   disabled={deleting}
+                  className="w-[48%]"
                 >
                   {deleting ? (
                     <>
                       <Loader2 className="w-4 h-4 mr-2 animate-spin" />
                       削除中...
                     </>
-                  ) : (
-                    <>
-                      <Trash2 className="w-4 h-4 mr-2" />
-                      削除する
-                    </>
-                  )}
+                  ) : "削除"}
                 </Button>
               </div>
             </div>
@@ -356,44 +350,44 @@ const WorkDetail = () => {
             </h2>
             
             <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
-              {/* 専門性分析 */}
+              {/* 創造性と独自性 */}
               <div className="bg-indigo-50 rounded-lg p-4">
                 <h3 className="text-lg font-semibold text-gray-900 mb-3 flex items-center">
                   <Fingerprint className="w-5 h-5 mr-2 text-indigo-600" />
-                  専門性分析
+                  創造性と独自性
                 </h3>
                 
-                {analysisResult.expertise && (
+                {analysisResult.originality && (
                   <>
-                    <p className="text-gray-700 mb-4">{analysisResult.expertise}</p>
+                    <p className="text-gray-700 mb-4">{analysisResult.originality}</p>
                   </>
                 )}
               </div>
               
-              {/* コンテンツスタイル */}
+              {/* 専門性とスキル */}
               <div className="bg-purple-50 rounded-lg p-4">
                 <h3 className="text-lg font-semibold text-gray-900 mb-3 flex items-center">
                   <Fingerprint className="w-5 h-5 mr-2 text-purple-600" />
-                  コンテンツスタイル
+                  専門性とスキル
                 </h3>
                 
-                {analysisResult.content_style && (
+                {analysisResult.quality && (
                   <>
-                    <p className="text-gray-700 mb-4">{analysisResult.content_style}</p>
+                    <p className="text-gray-700 mb-4">{analysisResult.quality}</p>
                   </>
                 )}
               </div>
               
-              {/* 作品のユニークさ */}
+              {/* 影響力と共感 */}
               <div className="bg-teal-50 rounded-lg p-4">
                 <h3 className="text-lg font-semibold text-gray-900 mb-3 flex items-center">
                   <BookOpen className="w-5 h-5 mr-2 text-teal-600" />
-                  作品のユニークさ
+                  影響力と共感
                 </h3>
                 
-                {analysisResult.uniqueness && (
+                {analysisResult.engagement && (
                   <>
-                    <p className="text-gray-700 mb-4">{analysisResult.uniqueness}</p>
+                    <p className="text-gray-700 mb-4">{analysisResult.engagement}</p>
                   </>
                 )}
               </div>

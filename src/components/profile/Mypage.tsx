@@ -15,7 +15,8 @@ import {
   AlertCircle,
   LogOut,
   FileType,
-  Image
+  Image,
+  Lightbulb
 } from 'lucide-react';
 import { 
   AreaChart, 
@@ -29,7 +30,7 @@ import {
 import { analyzeUserTagsApi } from '../../api/tag-analysis-api';
 import { getUserInsightsApi } from '../../api/user-insights';
 // 型定義をインポート
-import { UserProfile, Work, Career, DisplayAIAnalysisResult } from '../../types';
+import { UserProfile, Work, Career } from '../../types';
 
 // ユーザープロファイルの型定義
 // interface UserProfile {
@@ -77,27 +78,6 @@ import { UserProfile, Work, Career, DisplayAIAnalysisResult } from '../../types'
 //   updated_at?: string;
 // }
 
-// AI分析結果の型定義
-// interface DisplayAIAnalysisResult {
-//   expertise?: {
-//     summary: string;
-//   };
-//   talent?: {
-//     summary: string;
-//   };
-//   uniqueness?: {
-//     summary: string;
-//   };
-//   specialties?: string[];
-//   interests?: {
-//     areas?: string[];
-//     topics?: string[];
-//   };
-//   design_styles?: string[];
-//   tag_frequency?: { [key: string]: number };
-//   clusters?: Array<{ name: string; tags: string[] }>;
-// }
-
 const MONTHS = [
   '1月', '2月', '3月', '4月', '5月', '6月',
   '7月', '8月', '9月', '10月', '11月', '12月'
@@ -110,10 +90,18 @@ const Mypage: React.FC = () => {
   const [isLoading, setIsLoading] = useState<boolean>(true);
   const [isAnalyzing, setIsAnalyzing] = useState<boolean>(false);
   const [hasAnalysis, setHasAnalysis] = useState<boolean>(false);
-  const [aiAnalysisResult, setAiAnalysisResult] = useState<DisplayAIAnalysisResult>({
+  const [aiAnalysisResult, setAiAnalysisResult] = useState<any>({
+    // 旧プロパティ（互換性のため）
     expertise: { summary: '' },
     talent: { summary: '' },
     uniqueness: { summary: '' },
+    content_style: { summary: '' },
+    
+    // 新プロパティ（現在使用中）
+    originality: { summary: '' },
+    quality: { summary: '' },
+    engagement: { summary: '' },
+    
     specialties: [],
     interests: {
       areas: [],
@@ -121,8 +109,7 @@ const Mypage: React.FC = () => {
     },
     design_styles: [],
     tag_frequency: {},
-    clusters: [],
-    content_style: { summary: '' }
+    clusters: []
   });
   const [stats, setStats] = useState<Record<string, number[]>>({
     monthly: Array(12).fill(0)
@@ -464,8 +451,11 @@ const Mypage: React.FC = () => {
               },
               design_styles: [],
               tag_frequency: {},
-              clusters: []
-            });
+              clusters: [],
+              originality: { summary: 'このユーザーはまだAI分析を実行していません。' },
+              quality: { summary: 'AI分析が実行されると、ユーザーの才能や特徴が表示されます。' },
+              engagement: { summary: '分析できます' }
+            } as any);
             setHasAnalysis(true);
           }
         } else {
@@ -507,70 +497,49 @@ const Mypage: React.FC = () => {
           },
           design_styles: styleArray,
           tag_frequency: {},
-          clusters: []
+          clusters: [],
+          originality: { summary: expertiseArray.join('\n') },
+          quality: { summary: styleArray.join('\n') },
+          engagement: { summary: '分析待ちです' }
         };
 
         // 分析結果をステートに設定
         setAiAnalysisResult({
-          expertise: {
-            summary: insightData.expertise?.summary || ''
+          originality: {
+            summary: insightData.expertise?.summary || 'ライティングとコンテンツ制作において高い専門性を持っています。'
           },
-          talent: {
-            summary: insightData.talent?.summary || ''
+          quality: {
+            summary: insightData.talent?.summary || '明確で簡潔な表現スタイルで、読者に伝わりやすい文章を作成します。'
           },
-          uniqueness: {
-            summary: insightData.uniqueness?.summary || ''
+          engagement: {
+            summary: insightData.uniqueness?.summary || 'データに基づいた分析と創造的な表現を組み合わせた独自のアプローチが特徴です。'
           },
           content_style: {
-            summary: insightData.content_style?.summary || ''
+            summary: insightData.content_style?.summary || '明確で簡潔な表現スタイルで、読者に伝わりやすい文章を作成します。'
           },
-          specialties: insightData.specialties || [],
+          specialties: insightData.specialties || ['ライティング', 'コンテンツ制作', 'クリエイティブ'],
           interests: {
-            areas: insightData.interests?.areas || [],
+            areas: insightData.interests?.areas || ['コンテンツマーケティング', 'デジタルメディア', 'クリエイティブ表現'],
             topics: insightData.interests?.topics || []
           },
-          design_styles: insightData.design_styles || [],
+          design_styles: insightData.design_styles || ['シンプル', '明快', '効果的'],
           tag_frequency: {},
           clusters: insightData.clusters || []
-        });
+        } as any);
+        
         setHasAnalysis(true);
+        toast({
+          title: 'タグ分析が完了しました',
+          description: 'あなたの作品のタグに基づいて専門性やスタイルを分析しました',
+        });
       }
     } catch (error) {
-      console.error('Error in fetchUserInsights:', error);
-      console.log('Error details:', error);
+      console.error('Error analyzing user tags:', error);
       toast({
-        title: 'エラーが発生しました',
-        description: 'AI分析結果の取得中に予期せぬエラーが発生しました。時間をおいて再度お試しください。',
+        title: 'タグ分析に失敗しました',
+        description: error instanceof Error ? error.message : '不明なエラーが発生しました',
         variant: 'destructive'
       });
-      
-      // エラーが発生した場合でも、他のユーザーのプロフィールを表示している場合はサンプルデータを表示
-      if (!isCurrentUser) {
-        console.log('エラー発生時: 他のユーザーのプロフィール表示中のためサンプル分析結果を表示');
-        setAiAnalysisResult({
-          expertise: {
-            summary: 'このユーザーのAI分析結果を取得できませんでした。'
-          },
-          talent: {
-            summary: '一時的なエラーが発生していて、AI分析結果を取得できませんでした。'
-          },
-          uniqueness: {
-            summary: '分析できます'
-          },
-          content_style: {
-            summary: '後ほど再度アクセスしてみてください。'
-          },
-          specialties: [],
-          interests: {
-            areas: [],
-            topics: []
-          },
-          design_styles: [],
-          tag_frequency: {},
-          clusters: []
-        });
-        setHasAnalysis(true);
-      }
     }
   }, [isCurrentUser, toast]);
 
@@ -699,6 +668,7 @@ const Mypage: React.FC = () => {
       
       // 分析結果をステートに設定
       setAiAnalysisResult({
+        // 旧プロパティ（互換性のため）
         expertise: {
           summary: result.data.expertise?.summary || 'ライティングとコンテンツ制作において高い専門性を持っています。'
         },
@@ -708,6 +678,18 @@ const Mypage: React.FC = () => {
         uniqueness: {
           summary: result.data.uniqueness?.summary || 'データに基づいた分析と創造的な表現を組み合わせた独自のアプローチが特徴です。'
         },
+        
+        // 新プロパティ（現在使用中）
+        originality: {
+          summary: result.data.expertise?.summary || 'ライティングとコンテンツ制作において高い専門性を持っています。'
+        },
+        quality: {
+          summary: result.data.talent?.summary || '明確で簡潔な表現スタイルで、読者に伝わりやすい文章を作成します。'
+        },
+        engagement: {
+          summary: result.data.uniqueness?.summary || 'データに基づいた分析と創造的な表現を組み合わせた独自のアプローチが特徴です。'
+        },
+        
         content_style: {
           summary: result.data.content_style?.summary || '明確で簡潔な表現スタイルで、読者に伝わりやすい文章を作成します。'
         },
@@ -719,7 +701,7 @@ const Mypage: React.FC = () => {
         design_styles: result.data.design_styles || ['シンプル', '明快', '効果的'],
         tag_frequency: tagFrequency,
         clusters: result.data.clusters || []
-      });
+      } as any);
       
       setHasAnalysis(true);
       toast({
@@ -1245,7 +1227,7 @@ const Mypage: React.FC = () => {
                       rel="noopener noreferrer"
                       className="text-gray-600 hover:text-blue-600"
                     >
-                      <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" width="24" height="24" fill="currentColor">
+                      <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="h-5 w-5">
                         <path d="M22.46 6c-.77.35-1.6.58-2.46.69.88-.53 1.56-1.37 1.88-2.38-.83.5-1.75.85-2.72 1.05C18.37 4.5 17.26 4 16 4c-2.35 0-4.27 1.92-4.27 4.29 0 .34.04.67.11.98C8.28 9.09 5.11 7.38 3 4.79c-.37.63-.58 1.37-.58 2.15 0 1.49.75 2.81 1.91 3.56-.71 0-1.37-.2-1.95-.5v.03c0 2.08 1.48 3.82 3.44 4.21a4.22 4.22 0 0 1-1.93.07 4.28 4.28 0 0 0 4 2.98 8.521 8.521 0 0 1-5.33 1.84c-.34 0-.68-.02-1.02-.06C3.44 20.29 5.7 21 8.12 21 16 21 20.33 14.46 20.33 8.79c0-.19 0-.37-.01-.56.84-.6 1.56-1.36 2.14-2.23z" />
                       </svg>
                     </a>
@@ -1394,28 +1376,50 @@ const Mypage: React.FC = () => {
               </div>
             </div>
           ) : hasAnalysis ? (
-            <div className="space-y-4">
-              <div className="p-4 bg-blue-50 rounded-lg border border-blue-100">
-                <div className="flex items-center mb-2">
+            <div className="space-y-4" data-component-name="Mypage">
+              <div className="p-4 bg-blue-50 rounded-lg border border-blue-100" data-component-name="Mypage">
+                <div className="flex items-center mb-2" data-component-name="Mypage">
                   <AlertCircle className="h-5 w-5 text-blue-500 mr-2" />
                   <h4 className="text-md font-semibold">AI分析について</h4>
                 </div>
-                <p className="text-sm text-gray-600">
-                  この分析結果はあなたの作品から抽出したタグに基づいて生成されています。
-                  より正確な分析のためには、作品にタグを追加してください。
+                <p className="text-sm text-gray-600" data-component-name="Mypage">
+                  クリエイターの価値を測る要素は多様ですが、特に重要と考えられる以下の3つの要素から分析しています。これらの要素を総合的に見ることで、あなたの多面的な価値や魅力をより深く理解できます。
                 </p>
               </div>
 
-              {/* 専門性 */}
-              <div className="bg-white p-4 rounded-lg border border-gray-200">
-                <div className="flex items-center mb-2">
+              {/* 創造性と独自性 */}
+              <div className="bg-white p-4 rounded-lg border border-gray-200" data-component-name="Mypage">
+                <div className="flex items-center mb-2" data-component-name="Mypage">
                   <Star className="h-5 w-5 text-yellow-500 mr-2" />
-                  <h4 className="text-md font-semibold">専門性</h4>
+                  <h4 className="text-md font-semibold">創造性と独自性 (オリジナリティ)</h4>
                 </div>
-                <p className="text-sm text-gray-600">{aiAnalysisResult?.expertise?.summary || "まだ分析されていません"}</p>
+                <div className="mb-2">
+                  <p className="text-sm font-medium text-gray-700 mb-1">内容:</p>
+                  <p className="text-sm text-gray-600">
+                    新しいアイデアや表現を生み出す能力、既存の概念を独自の視点で再解釈する力を指します。他者と差別化された独自の世界観や表現スタイルを確立することで、作品に唯一無二の価値が生まれます。
+                  </p>
+                </div>
+                <div className="mb-2">
+                  <p className="text-sm font-medium text-gray-700 mb-1">分析結果:</p>
+                  <p className="text-sm text-gray-600">{aiAnalysisResult?.originality?.summary && aiAnalysisResult.originality.summary.length > 140 ? `${aiAnalysisResult.originality.summary.substring(0, 137)}...` : aiAnalysisResult?.originality?.summary || "まだ分析されていません"}</p>
+                  {aiAnalysisResult?.originality?.summary && 
+                    <span className="block mt-1 text-xs text-indigo-600">
+                      今後、異なる分野の知識を組み合わせることで、さらに独自性を高める可能性があります。新たな表現方法の探求も魅力を高めます。
+                    </span>
+                  }
+                </div>
+                <div>
+                  <p className="text-sm font-medium text-gray-700 mb-1">指標例:</p>
+                  <ul className="text-sm text-gray-600 list-disc pl-5 space-y-1">
+                    <li>新規性：これまでにない新しい視点や表現</li>
+                    <li>独創性：他者と明確に区別される独自の特徴</li>
+                    <li>革新性：既存の枠組みを超える挑戦的な試み</li>
+                    <li>実験性：従来の手法にとらわれない実験的アプローチ</li>
+                  </ul>
+                </div>
                 {aiAnalysisResult?.specialties && aiAnalysisResult.specialties.length > 0 && (
                   <div className="mt-2 flex flex-wrap gap-1">
-                    {aiAnalysisResult.specialties.map((specialty, index) => (
+                    {aiAnalysisResult.specialties.map((specialty: string, index: number) => (
                       <span
                         key={index}
                         className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-yellow-100 text-yellow-800"
@@ -1427,16 +1431,40 @@ const Mypage: React.FC = () => {
                 )}
               </div>
 
-              {/* コンテンツスタイル */}
-              <div className="bg-white p-4 rounded-lg border border-gray-200">
-                <div className="flex items-center mb-2">
+              {/* 専門性とスキル */}
+              <div className="bg-white p-4 rounded-lg border border-gray-200" data-component-name="Mypage">
+                <div className="flex items-center mb-2" data-component-name="Mypage">
                   <Brush className="h-5 w-5 text-orange-500 mr-2" />
-                  <h4 className="text-md font-semibold">コンテンツスタイル</h4>
+                  <h4 className="text-md font-semibold">専門性とスキル (クオリティ)</h4>
                 </div>
-                <p className="text-sm text-gray-600">{aiAnalysisResult?.content_style?.summary || "まだ分析されていません"}</p>
+                <div className="mb-2">
+                  <p className="text-sm font-medium text-gray-700 mb-1">内容:</p>
+                  <p className="text-sm text-gray-600">
+                    特定の分野における知識や技術の深さと幅を表します。専門的な知見に基づいた質の高い作品制作能力や、技術的な完成度の高さが作品の信頼性と価値を高めます。
+                  </p>
+                </div>
+                <div className="mb-2">
+                  <p className="text-sm font-medium text-gray-700 mb-1">分析結果:</p>
+                  <p className="text-sm text-gray-600">{aiAnalysisResult?.quality?.summary && aiAnalysisResult.quality.summary.length > 140 ? `${aiAnalysisResult.quality.summary.substring(0, 137)}...` : aiAnalysisResult?.quality?.summary || "まだ分析されていません"}</p>
+                  {aiAnalysisResult?.quality?.summary && 
+                    <span className="block mt-1 text-xs text-indigo-600">
+                      継続的な学習と実践により、さらにスキルを磨き、専門性を深めていくことができるでしょう。新たな技術の習得も視野に入れてみてはいかがでしょうか。
+                    </span>
+                  }
+                </div>
+                <div>
+                  <p className="text-sm font-medium text-gray-700 mb-1">指標例:</p>
+                  <ul className="text-sm text-gray-600 list-disc pl-5 space-y-1">
+                    <li>技術的完成度：作品の仕上がりや精度の高さ</li>
+                    <li>専門知識の深さ：特定分野における専門的な知見</li>
+                    <li>一貫性：作品全体を通じた質とスタイルの安定性</li>
+                    <li>問題解決力：複雑な課題に対する効果的な解決方法の提示</li>
+                    <li>洗練度：細部まで行き届いた丁寧な仕上げ</li>
+                  </ul>
+                </div>
                 {aiAnalysisResult?.design_styles && aiAnalysisResult.design_styles.length > 0 && (
                   <div className="mt-2 flex flex-wrap gap-1">
-                    {aiAnalysisResult.design_styles.map((style, index) => (
+                    {aiAnalysisResult.design_styles.map((style: string, index: number) => (
                       <span
                         key={index}
                         className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-orange-100 text-orange-800"
@@ -1448,16 +1476,40 @@ const Mypage: React.FC = () => {
                 )}
               </div>
 
-              {/* 作品のユニークさ */}
-              <div className="bg-white p-4 rounded-lg border border-gray-200">
-                <div className="flex items-center mb-2">
+              {/* 影響力と共感 */}
+              <div className="bg-white p-4 rounded-lg border border-gray-200" data-component-name="Mypage">
+                <div className="flex items-center mb-2" data-component-name="Mypage">
                   <Compass className="h-5 w-5 text-indigo-500 mr-2" />
-                  <h4 className="text-md font-semibold">作品のユニークさ</h4>
+                  <h4 className="text-md font-semibold">影響力と共感 (エンゲージメント)</h4>
                 </div>
-                <p className="text-sm text-gray-600">{aiAnalysisResult?.uniqueness?.summary || "まだ分析されていません"}</p>
+                <div className="mb-2">
+                  <p className="text-sm font-medium text-gray-700 mb-1">内容:</p>
+                  <p className="text-sm text-gray-600">
+                    作品が他者に与える影響や共感を呼び起こす力を指します。感情を動かし、新たな視点や行動の変化を促す作品は、社会的価値や文化的意義を持ち、より広い影響力を持ちます。
+                  </p>
+                </div>
+                <div className="mb-2">
+                  <p className="text-sm font-medium text-gray-700 mb-1">分析結果:</p>
+                  <p className="text-sm text-gray-600">{aiAnalysisResult?.engagement?.summary && aiAnalysisResult.engagement.summary.length > 140 ? `${aiAnalysisResult.engagement.summary.substring(0, 137)}...` : aiAnalysisResult?.engagement?.summary || "まだ分析されていません"}</p>
+                  {aiAnalysisResult?.engagement?.summary && 
+                    <span className="block mt-1 text-xs text-indigo-600">
+                      多様な視点を取り入れ、ターゲットオーディエンスとの対話を深めることで、さらなる共感と影響力を生み出せるでしょう。社会的な文脈との接続も魅力を高めます。
+                    </span>
+                  }
+                </div>
+                <div>
+                  <p className="text-sm font-medium text-gray-700 mb-1">指標例:</p>
+                  <ul className="text-sm text-gray-600 list-disc pl-5 space-y-1">
+                    <li>共感性：観客の感情や経験に響く力</li>
+                    <li>社会的影響力：社会的議論や変化を促す可能性</li>
+                    <li>記憶に残る度合い：長期的に記憶に残る印象の強さ</li>
+                    <li>対話性：観客との相互作用を促す要素</li>
+                    <li>普遍性：幅広い層に受け入れられる要素</li>
+                  </ul>
+                </div>
                 {aiAnalysisResult?.interests?.areas && aiAnalysisResult.interests.areas.length > 0 && (
                   <div className="mt-2 flex flex-wrap gap-1">
-                    {aiAnalysisResult.interests.areas.map((interest, index) => (
+                    {aiAnalysisResult.interests.areas.map((interest: string, index: number) => (
                       <span
                         key={index}
                         className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-indigo-100 text-indigo-800"
@@ -1467,6 +1519,20 @@ const Mypage: React.FC = () => {
                     ))}
                   </div>
                 )}
+              </div>
+              
+              {/* 総合的な考察 */}
+              <div className="bg-white p-4 rounded-lg border border-gray-200 mt-4" data-component-name="Mypage">
+                <div className="flex items-center mb-2" data-component-name="Mypage">
+                  <Lightbulb className="h-5 w-5 text-green-500 mr-2" />
+                  <h4 className="text-md font-semibold">総合的な考察</h4>
+                </div>
+                <p className="text-sm text-gray-600 mb-3">
+                  これらの要素は相互に関連し合い、クリエイターとしての総合的な価値を形成しています。一つの要素が他の要素を強化し、全体として独自の魅力を生み出しています。
+                </p>
+                <p className="text-sm text-gray-600">
+                  あなたの創造性と情熱は、今後さらに多くの可能性を広げていくでしょう。新たな挑戦や異なる分野との融合を通じて、クリエイターとしての価値をさらに高めていくことができます。自分の強みを活かしながら、好奇心を持って探求を続けることが、長期的な成長につながります。
+                </p>
               </div>
             </div>
           ) : (

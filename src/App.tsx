@@ -213,8 +213,8 @@ function LandingPage() {
               AIがあなたの作品を<span className="text-indigo-600">多角的に分析</span>
             </h2>
             <p className="mt-6 text-lg leading-8 text-gray-600">
-              URLを入力するだけで、あなたの作品を自動で分析。<br />
-              自分では気づかなかった強みを発見し、独自の魅力を客観的に把握できます。
+              クリエイターの価値を測る要素は多様ですが、Baluboでは特に重要な3つの要素を分析。<br />
+              URLを入力するだけで、あなたの作品の真の価値を客観的に可視化します。
             </p>
           </div>
           <div className="mx-auto mt-16 max-w-2xl sm:mt-20 lg:mt-24 lg:max-w-none">
@@ -222,37 +222,43 @@ function LandingPage() {
               <div className="flex flex-col">
                 <dt className="flex items-center gap-x-3 text-xl font-semibold leading-7 text-gray-900">
                   <Sparkles className="h-6 w-6 flex-none text-indigo-600" aria-hidden="true" />
-                  専門性分析
+                  創造性と独自性
+                  <span className="text-indigo-600 ml-1 text-sm">(オリジナリティ)</span>
                 </dt>
                 <dd className="mt-4 flex flex-auto flex-col text-base leading-7 text-gray-600">
                   <p className="flex-auto">
-                    あなたの作品から専門性を自動抽出。どんな分野に強みがあるかを可視化します。
+                    あなたの作品の独創性や新しい視点を分析。他のクリエイターとの差別化ポイントを明確にします。
                   </p>
                 </dd>
               </div>
               <div className="flex flex-col">
                 <dt className="flex items-center gap-x-3 text-xl font-semibold leading-7 text-gray-900">
                   <FileText className="h-6 w-6 flex-none text-indigo-600" aria-hidden="true" />
-                 コンテンツスタイル分析
+                  専門性とスキル
+                  <span className="text-indigo-600 ml-1 text-sm">(クオリティ)</span>
                 </dt>
                 <dd className="mt-4 flex flex-auto flex-col text-base leading-7 text-gray-600">
                   <p className="flex-auto">
-                    あなたの文章の特徴や表現スタイルを分析。独自の魅力を客観的に把握できます。
+                    あなたの専門知識や技術的な熟練度を評価。作品の質や完成度を客観的に分析します。
                   </p>
                 </dd>
               </div>
               <div className="flex flex-col">
                 <dt className="flex items-center gap-x-3 text-xl font-semibold leading-7 text-gray-900">
                   <LineChart className="h-6 w-6 flex-none text-indigo-600" aria-hidden="true" />
-                  作品のユニークさ分析
+                  影響力と共感
+                  <span className="text-indigo-600 ml-1 text-sm">(エンゲージメント)</span>
                 </dt>
                 <dd className="mt-4 flex flex-auto flex-col text-base leading-7 text-gray-600">
                   <p className="flex-auto">
-                    あなたが取り上げる題材から作品のユニークさを分析。自分では気づかなかった傾向を発見できます。
+                    あなたの作品が読者や視聴者に与える影響力や共感性を分析。感情的な繋がりを生み出す力を評価します。
                   </p>
                 </dd>
               </div>
             </dl>
+            <p className="mt-12 text-center text-base text-gray-600">
+              これら3つの要素を総合的に見ることで、あなたの多面的な価値や魅力をより深く理解できます。
+            </p>
           </div>
         </div>
       </section>
