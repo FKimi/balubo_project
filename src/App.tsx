@@ -16,7 +16,6 @@ import {
   PenTool, 
   BrainCircuit, 
   ChevronDown,
-  Shield,
   HelpCircle
 } from 'lucide-react';
 import { SignUpForm } from './components/SignUpForm';
@@ -69,9 +68,9 @@ function LandingPage() {
             <span className="block mt-2">ミスマッチのない最適な仕事と出会う</span>
           </h1>
           <p className="mt-6 text-lg leading-8 text-gray-600">
-            作品URLからAIがあなたの隠れた強みを解き放つ。<br />
-            客観的な<span className="text-indigo-600">自己分析</span>で、自信を持って価値を伝え、<br />
-            <span className="text-indigo-600">理想のマッチング</span>を実現します。
+            クリエイターの才能は、時に自分自身では気づかないもの。<br />
+            Baluboは<span className="text-indigo-600">AI分析</span>であなたの作品から隠れた強みを可視化し、<br />
+            <span className="text-indigo-600">客観的な自己理解</span>と<span className="text-indigo-600">最適なマッチング</span>を実現するポートフォリオサービスです。
           </p>
           <div className="mt-10 flex items-center justify-center gap-x-6">
             <button
@@ -311,7 +310,7 @@ function LandingPage() {
               </div>
               <h3 className="text-xl font-semibold mb-2">作品URL入力</h3>
               <p className="text-gray-600">
-                あなたの作品のURLを入力するだけ。ブログ記事、note、Qiitaなど様々なプラットフォームに対応。
+                あなたの作品のURLを入力するだけ。ニュースメディア、note、ブログなどさまざまなプラットフォームに対応。
               </p>
             </div>
             
@@ -323,42 +322,6 @@ function LandingPage() {
               <h3 className="text-xl font-semibold mb-2">AI分析実行</h3>
               <p className="text-gray-600">
                 AIがあなたの作品を自動分析。専門性、スタイル、作品のユニークさなどを客観的に可視化します。
-              </p>
-            </div>
-          </div>
-        </div>
-      </section>
-
-      {/* 信頼性・安心感セクション */}
-      <section className="py-16 bg-white">
-        <div className="mx-auto max-w-7xl px-6 lg:px-8">
-          <div className="mx-auto max-w-2xl text-center mb-12">
-            <h2 className="text-3xl font-bold tracking-tight text-gray-900 sm:text-4xl">
-              安心してご利用いただけます
-            </h2>
-            <p className="mt-4 text-lg text-gray-600">
-              セキュリティとプライバシーを最優先に考えたサービス設計
-            </p>
-          </div>
-          
-          <div className="grid grid-cols-1 gap-8 md:grid-cols-2">
-            <div className="bg-white p-6 rounded-lg border border-gray-200">
-              <div className="flex items-center mb-4">
-                <Shield className="h-8 w-8 text-indigo-600 mr-3" />
-                <h3 className="text-xl font-semibold">データ保護</h3>
-              </div>
-              <p className="text-gray-600">
-                あなたの個人情報や作品データは厳重に保護されます。データは暗号化され、必要な場合にのみアクセスされます。
-              </p>
-            </div>
-            
-            <div className="bg-white p-6 rounded-lg border border-gray-200">
-              <div className="flex items-center mb-4">
-                <BrainCircuit className="h-8 w-8 text-indigo-600 mr-3" />
-                <h3 className="text-xl font-semibold">高品質なAI分析</h3>
-              </div>
-              <p className="text-gray-600">
-                AIを使用した高精度な分析を提供。客観的かつ公平な評価を心がけ、あなたの真の価値を引き出します。
               </p>
             </div>
           </div>
