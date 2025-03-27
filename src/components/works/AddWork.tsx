@@ -5,7 +5,7 @@ import { analyzeContent } from '../../lib/gemini';
 import { extractDataFromUrl } from '../../lib/gemini-url-service';
 import { extractDataFromUrlWithMetadata } from '../../lib/url-metadata';
 import { createTag } from '../../api/tags'; // createTag関数をインポート
-import { ArrowLeft, FileText, ImageIcon, Loader2, BrainCircuit, X } from 'lucide-react';
+import { ArrowLeft, FileText, ImageIcon, Loader2, BrainCircuit, X, Camera, Trash2 } from 'lucide-react';
 
 // ContentInput型定義をインポートせずに直接定義
 interface ContentInput {
@@ -55,7 +55,12 @@ export const AddWork = () => {
   const { id: workId } = useParams<{ id: string }>();
   const isEditMode = !!workId;
   
-  const [selectedType, setSelectedType] = useState('writing');
+  // URLパラメータからタイプを取得
+  const location = window.location;
+  const queryParams = new URLSearchParams(location.search);
+  const typeParam = queryParams.get('type');
+  
+  const [selectedType, setSelectedType] = useState(typeParam === 'design' ? 'design' : 'writing');
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [fetchingUrl, setFetchingUrl] = useState(false);
@@ -72,14 +77,20 @@ export const AddWork = () => {
     source_url: '',
     thumbnail_url: '',
     tags: [] as string[],
-    work_type: 'writing',
+    work_type: typeParam === 'design' ? 'design' : 'writing',
     design_type: '',
     design_url: '',
     behance_url: '',
     dribbble_url: '',
     is_public: true,
-    roles: [] as string[]
+    roles: [] as string[],
+    // 画像アップロード関連のフィールドを追加
+    image_file: null as File | null,
+    image_preview: '' as string
   });
+
+  // ファイル入力用のref
+  const fileInputRef = useRef<HTMLInputElement>(null);
 
   // 編集モードの場合、既存の作品データを読み込む
   useEffect(() => {
@@ -147,7 +158,9 @@ export const AddWork = () => {
           behance_url: workData.behance_url || '',
           dribbble_url: workData.dribbble_url || '',
           is_public: workData.is_public !== false,
-          roles: workData.roles || []
+          roles: workData.roles || [],
+          image_file: null,
+          image_preview: workData.thumbnail_url || ''
         });
         
         // 作品タイプに基づいて選択状態を更新
@@ -324,6 +337,85 @@ export const AddWork = () => {
     setForm(prev => ({ ...prev, [name]: value }));
   };
 
+  // 画像ファイル選択処理
+  const handleFileSelect = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const files = e.target.files;
+    if (!files || files.length === 0) return;
+    
+    const file = files[0];
+    // 画像ファイルのみ許可（MIME typeチェック）
+    if (!file.type.startsWith('image/')) {
+      setError('画像ファイルのみアップロードできます');
+      return;
+    }
+    
+    // ファイルサイズチェック（5MB以下）
+    if (file.size > 5 * 1024 * 1024) {
+      setError('ファイルサイズは5MB以下にしてください');
+      return;
+    }
+    
+    // プレビュー用のURLを作成
+    const previewUrl = URL.createObjectURL(file);
+    
+    setForm(prev => ({
+      ...prev,
+      image_file: file,
+      image_preview: previewUrl,
+      // デザイン作品の場合はサムネイルも自動設定
+      thumbnail_url: selectedType === 'design' ? previewUrl : prev.thumbnail_url
+    }));
+    
+    setError(null);
+  };
+  
+  // 画像ファイルのクリア処理
+  const handleClearImage = () => {
+    if (form.image_preview) {
+      URL.revokeObjectURL(form.image_preview);
+    }
+    
+    setForm(prev => ({
+      ...prev,
+      image_file: null,
+      image_preview: ''
+    }));
+  };
+  
+  // 画像ファイルのアップロード処理
+  const uploadImage = async (): Promise<string | null> => {
+    if (!form.image_file) return null;
+    
+    try {
+      // ユーザー情報を取得
+      const { data: { user } } = await supabase.auth.getUser();
+      if (!user) throw new Error('ログインが必要です');
+      
+      // ファイル名を生成（ユニーク化）
+      const fileExt = form.image_file.name.split('.').pop();
+      const fileName = `${user.id}_${Date.now()}.${fileExt}`;
+      const filePath = `designs/${fileName}`;
+      
+      // Supabaseストレージにアップロード
+      const { error: uploadError } = await supabase.storage
+        .from('works')
+        .upload(filePath, form.image_file);
+      
+      if (uploadError) throw uploadError;
+      
+      // 公開URLを取得
+      const { data: { publicUrl } } = supabase.storage
+        .from('works')
+        .getPublicUrl(filePath);
+      
+      return publicUrl;
+    } catch (error) {
+      console.error('画像アップロードエラー:', error instanceof Error ? error.message : String(error));
+      setError('画像のアップロードに失敗しました');
+      return null;
+    }
+  };
+
   // フォーム送信処理
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -342,17 +434,35 @@ export const AddWork = () => {
       if (!user) {
         throw new Error('ログインが必要です');
       }
+
+      // デザインタイプの場合、画像のアップロードを確認
+      if (selectedType === 'design' && !form.image_file && !form.thumbnail_url) {
+        setError('デザイン・写真作品には画像のアップロードが必要です');
+        setLoading(false);
+        return;
+      }
+      
+      // 画像アップロード（デザインタイプの場合）
+      let uploadedImageUrl = null;
+      if (selectedType === 'design' && form.image_file) {
+        uploadedImageUrl = await uploadImage();
+        if (!uploadedImageUrl) {
+          setError('画像のアップロードに失敗しました');
+          setLoading(false);
+          return;
+        }
+      }
       
       // 作品データの準備
       const workData: WorkData = {
         title: form.title,
         description: form.description,
         source_url: form.source_url,
-        thumbnail_url: form.thumbnail_url,
-        design_type: form.design_type,
-        design_url: form.design_url,
-        behance_url: form.behance_url,
-        dribbble_url: form.dribbble_url,
+        thumbnail_url: uploadedImageUrl || form.thumbnail_url,
+        design_type: selectedType === 'design' ? form.design_type : '',
+        design_url: selectedType === 'design' ? form.design_url : '',
+        behance_url: selectedType === 'design' ? form.behance_url : '',
+        dribbble_url: selectedType === 'design' ? form.dribbble_url : '',
         work_type: form.work_type,
         is_public: form.is_public,
         user_id: user.id,
@@ -588,33 +698,35 @@ export const AddWork = () => {
             </div>
 
             {/* 作品URL入力フィールド */}
-            <div className="mb-4">
-              <label className="block text-sm font-medium text-gray-700 mb-1">
-                作品URL
-              </label>
-              <div className="relative">
-                <input
-                  type="url"
-                  value={form.source_url}
-                  onChange={(e) => handleUrlChange(e.target.value)}
-                  placeholder="https://example.com/your-work"
-                  className="block w-full rounded-md border-gray-300 shadow-sm focus:border-indigo-500 focus:ring-indigo-500 sm:text-sm pr-10"
-                />
+            {selectedType === 'writing' && (
+              <div className="mb-4">
+                <label className="block text-sm font-medium text-gray-700 mb-1">
+                  作品URL
+                </label>
+                <div className="relative">
+                  <input
+                    type="url"
+                    value={form.source_url}
+                    onChange={(e) => handleUrlChange(e.target.value)}
+                    placeholder="https://example.com/your-work"
+                    className="block w-full rounded-md border-gray-300 shadow-sm focus:border-indigo-500 focus:ring-indigo-500 sm:text-sm pr-10"
+                  />
+                  {fetchingUrl && (
+                    <div className="absolute inset-y-0 right-0 flex items-center pr-3">
+                      <Loader2 className="h-4 w-4 text-gray-400 animate-spin" />
+                    </div>
+                  )}
+                </div>
                 {fetchingUrl && (
-                  <div className="absolute inset-y-0 right-0 flex items-center pr-3">
-                    <Loader2 className="h-4 w-4 text-gray-400 animate-spin" />
-                  </div>
+                  <p className="mt-1 text-xs text-gray-500">URLから情報を取得中...</p>
+                )}
+                {error && (
+                  <p className="mt-1 text-xs text-red-500">{error}</p>
                 )}
               </div>
-              {fetchingUrl && (
-                <p className="mt-1 text-xs text-gray-500">URLから情報を取得中...</p>
-              )}
-              {error && (
-                <p className="mt-1 text-xs text-red-500">{error}</p>
-              )}
-            </div>
+            )}
 
-            {/* サムネイル画像表示 */}
+            {/* サムネイル画像表示 - 両方のタイプで表示 */}
             {form.thumbnail_url && (
               <div className="mb-4">
                 <label className="block text-sm font-medium text-gray-700 mb-1">
@@ -630,7 +742,120 @@ export const AddWork = () => {
               </div>
             )}
 
-            {/* 説明文入力フィールド */}
+            {/* 画像アップロード - デザインタイプの場合のみ表示 */}
+            {selectedType === 'design' && (
+              <div className="mb-4">
+                <label className="block text-sm font-medium text-gray-700 mb-1">
+                  画像アップロード
+                </label>
+                <div className="flex justify-center">
+                  <input
+                    type="file"
+                    ref={fileInputRef}
+                    onChange={handleFileSelect}
+                    accept="image/*"
+                    className="hidden"
+                  />
+                  <button
+                    type="button"
+                    onClick={() => fileInputRef.current?.click()}
+                    className="inline-flex items-center px-3 py-2 border border-gray-300 rounded-md bg-gray-50 text-gray-500 hover:bg-gray-100"
+                  >
+                    <Camera className="h-4 w-4 mr-1" />
+                    画像を選択
+                  </button>
+                  {form.image_preview && (
+                    <button
+                      type="button"
+                      onClick={handleClearImage}
+                      className="inline-flex items-center px-3 py-2 border border-gray-300 rounded-md bg-gray-50 text-gray-500 hover:bg-gray-100 ml-2"
+                    >
+                      <Trash2 className="h-4 w-4 mr-1" />
+                      画像をクリア
+                    </button>
+                  )}
+                </div>
+                {form.image_preview && (
+                  <div className="mt-2">
+                    <img
+                      src={form.image_preview}
+                      alt="アップロード画像"
+                      className="w-full h-48 object-cover"
+                    />
+                  </div>
+                )}
+              </div>
+            )}
+
+            {/* デザインタイプの場合の追加フィールド */}
+            {selectedType === 'design' && (
+              <>
+                <div className="mb-4">
+                  <label htmlFor="design_type" className="block text-sm font-medium text-gray-700 mb-1">
+                    デザインタイプ
+                  </label>
+                  <select
+                    id="design_type"
+                    value={form.design_type}
+                    onChange={(e) => handleInputChange('design_type', e.target.value)}
+                    className="block w-full rounded-md border-gray-300 shadow-sm focus:border-indigo-500 focus:ring-indigo-500 sm:text-sm"
+                  >
+                    <option value="">選択してください</option>
+                    <option value="web">Webデザイン</option>
+                    <option value="graphic">グラフィックデザイン</option>
+                    <option value="ui">UIデザイン</option>
+                    <option value="illustration">イラスト</option>
+                    <option value="photo">写真</option>
+                    <option value="other">その他</option>
+                  </select>
+                </div>
+
+                <div className="mb-4">
+                  <label htmlFor="design_url" className="block text-sm font-medium text-gray-700 mb-1">
+                    デザイン公開URL（任意）
+                  </label>
+                  <input
+                    type="url"
+                    id="design_url"
+                    value={form.design_url}
+                    onChange={(e) => handleInputChange('design_url', e.target.value)}
+                    className="block w-full rounded-md border-gray-300 shadow-sm focus:border-indigo-500 focus:ring-indigo-500 sm:text-sm"
+                    placeholder="https://example.com/your-design"
+                  />
+                </div>
+
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mb-4">
+                  <div>
+                    <label htmlFor="behance_url" className="block text-sm font-medium text-gray-700 mb-1">
+                      Behance URL（任意）
+                    </label>
+                    <input
+                      type="url"
+                      id="behance_url"
+                      value={form.behance_url}
+                      onChange={(e) => handleInputChange('behance_url', e.target.value)}
+                      className="block w-full rounded-md border-gray-300 shadow-sm focus:border-indigo-500 focus:ring-indigo-500 sm:text-sm"
+                      placeholder="https://behance.net/username"
+                    />
+                  </div>
+                  <div>
+                    <label htmlFor="dribbble_url" className="block text-sm font-medium text-gray-700 mb-1">
+                      Dribbble URL（任意）
+                    </label>
+                    <input
+                      type="url"
+                      id="dribbble_url"
+                      value={form.dribbble_url}
+                      onChange={(e) => handleInputChange('dribbble_url', e.target.value)}
+                      className="block w-full rounded-md border-gray-300 shadow-sm focus:border-indigo-500 focus:ring-indigo-500 sm:text-sm"
+                      placeholder="https://dribbble.com/username"
+                    />
+                  </div>
+                </div>
+              </>
+            )}
+
+            {/* 説明文入力フィールド - 両方のタイプで表示 */}
             <div className="mb-4">
               <label htmlFor="description" className="block text-sm font-medium text-gray-700 mb-1">
                 説明文
