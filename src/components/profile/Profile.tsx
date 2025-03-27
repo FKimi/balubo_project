@@ -276,13 +276,7 @@ export function Profile() {
       <div className="bg-white shadow-sm">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
           <div className="flex justify-between h-16 items-center">
-            <button
-              onClick={() => navigate(-1)}
-              className="inline-flex items-center px-3 py-2 border border-gray-300 shadow-sm text-sm leading-4 font-medium rounded-md text-gray-700 bg-white hover:bg-gray-50"
-            >
-              <ArrowLeft className="mr-2 h-4 w-4" />
-              戻る
-            </button>
+            <div></div>
             <h1 className="text-xl font-bold text-indigo-600">Balubo</h1>
           </div>
         </div>
