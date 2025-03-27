@@ -621,3 +621,48 @@ export const fetchRelatedWorksWithAdmin = async (userId: string, currentWorkId: 
     return { data: [], error: err };
   }
 };
+
+// 作品を削除する関数
+export const deleteWorkWithAdmin = async (workId: string) => {
+  try {
+    // まず関連するタグの関連付けを削除
+    const { error: tagError } = await supabaseAdmin
+      .from('work_tags')
+      .delete()
+      .eq('work_id', workId);
+    
+    if (tagError) {
+      console.error('タグ関連付け削除エラー:', tagError);
+      return { data: null, error: tagError };
+    }
+    
+    // 次にAI分析結果を削除
+    const { error: analysisError } = await supabaseAdmin
+      .from('work_analysis')
+      .delete()
+      .eq('work_id', workId);
+    
+    if (analysisError) {
+      console.error('AI分析結果削除エラー:', analysisError);
+      // 分析結果がない場合もあるので、エラーがあっても続行
+    }
+    
+    // 最後に作品自体を削除
+    const { data, error } = await supabaseAdmin
+      .from('works')
+      .delete()
+      .eq('id', workId)
+      .select()
+      .single();
+    
+    if (error) {
+      console.error('作品削除エラー:', error);
+      return { data: null, error };
+    }
+    
+    return { data, error: null };
+  } catch (error) {
+    console.error('作品削除中の予期せぬエラー:', error);
+    return { data: null, error };
+  }
+};

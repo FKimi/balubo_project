@@ -5,7 +5,8 @@ import {
   fetchWorkWithAdmin, 
   fetchWorkTagsWithAdmin, 
   fetchWorkAnalysisWithAdmin, 
-  fetchRelatedWorksWithAdmin 
+  fetchRelatedWorksWithAdmin,
+  deleteWorkWithAdmin
 } from '../lib/supabase-admin';
 import { useToast } from '../lib/hooks/useToast';
 import { Button } from './Button';
@@ -19,7 +20,8 @@ import {
   Loader2,
   BrainCircuit,
   Fingerprint,
-  BookOpen
+  BookOpen,
+  Trash2
 } from 'lucide-react';
 
 // 作品データの型定義
@@ -55,6 +57,8 @@ const WorkDetail = () => {
   const [analysisResult, setAnalysisResult] = useState<AnalysisResult | null>(null);
   const [loading, setLoading] = useState(true);
   const [isOwner, setIsOwner] = useState(false);
+  const [showDeleteConfirm, setShowDeleteConfirm] = useState(false);
+  const [deleting, setDeleting] = useState(false);
 
   useEffect(() => {
     const fetchWorkDetails = async () => {
@@ -166,6 +170,44 @@ const WorkDetail = () => {
     });
   };
   
+  // 作品削除処理
+  const handleDeleteWork = async () => {
+    if (!id) return;
+    
+    try {
+      setDeleting(true);
+      
+      const { error } = await deleteWorkWithAdmin(id);
+      
+      if (error) {
+        console.error('作品削除エラー:', error);
+        toast.error({ 
+          title: '作品の削除に失敗しました', 
+          description: '時間をおいて再度お試しください' 
+        });
+        setDeleting(false);
+        setShowDeleteConfirm(false);
+        return;
+      }
+      
+      toast.success({ 
+        title: '作品を削除しました', 
+        description: '作品が正常に削除されました' 
+      });
+      
+      // マイページに遷移
+      navigate('/mypage');
+    } catch (err) {
+      console.error('作品削除中の予期せぬエラー:', err);
+      toast.error({ 
+        title: '作品の削除に失敗しました', 
+        description: '時間をおいて再度お試しください' 
+      });
+      setDeleting(false);
+      setShowDeleteConfirm(false);
+    }
+  };
+  
   if (loading) {
     return (
       <div className="flex flex-col items-center justify-center min-h-screen p-4">
@@ -204,6 +246,52 @@ const WorkDetail = () => {
             <Edit className="w-4 h-4 mr-2" />
             編集
           </Button>
+        )}
+        
+        {isOwner && (
+          <Button 
+            onClick={() => setShowDeleteConfirm(true)} 
+            className="float-right ml-2"
+          >
+            <Trash2 className="w-4 h-4 mr-2" />
+            削除
+          </Button>
+        )}
+        
+        {showDeleteConfirm && (
+          <div className="fixed inset-0 bg-gray-900 bg-opacity-50 flex justify-center items-center z-50">
+            <div className="bg-white rounded-lg shadow-md p-6 w-96">
+              <h2 className="text-lg font-bold text-gray-900 mb-4">作品を削除しますか?</h2>
+              <p className="text-gray-600 mb-6">作品を削除すると、作品データが完全に消去されます。この操作は元に戻せません。</p>
+              <div className="flex justify-end">
+                <Button 
+                  variant="text" 
+                  onClick={() => setShowDeleteConfirm(false)} 
+                  className="mr-2"
+                  disabled={deleting}
+                >
+                  キャンセル
+                </Button>
+                <Button 
+                  variant="destructive"
+                  onClick={handleDeleteWork} 
+                  disabled={deleting}
+                >
+                  {deleting ? (
+                    <>
+                      <Loader2 className="w-4 h-4 mr-2 animate-spin" />
+                      削除中...
+                    </>
+                  ) : (
+                    <>
+                      <Trash2 className="w-4 h-4 mr-2" />
+                      削除する
+                    </>
+                  )}
+                </Button>
+              </div>
+            </div>
+          </div>
         )}
       </div>
       
