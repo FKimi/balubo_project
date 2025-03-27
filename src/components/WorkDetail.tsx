@@ -1,6 +1,12 @@
 import { useState, useEffect } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import { supabase } from '../lib/supabase';
+import { 
+  fetchWorkWithAdmin, 
+  fetchWorkTagsWithAdmin, 
+  fetchWorkAnalysisWithAdmin, 
+  fetchRelatedWorksWithAdmin 
+} from '../lib/supabase-admin';
 import { useToast } from '../lib/hooks/useToast';
 import { Button } from './Button';
 import { Badge } from './Badge';
@@ -32,22 +38,11 @@ interface Work {
 
 // AI分析結果の型定義
 interface AnalysisResult {
-  expertise: {
-    categories: Array<{ name: string; score: number }>;
-    summary: string;
-  };
-  content_style: {
-    features: Array<{ name: string; score: number }>;
-    summary: string;
-  };
-  interests: {
-    tags: string[];
-    summary: string;
-  };
-  appeal_points?: {
-    points: Array<{ title: string; description: string }>;
-    summary: string;
-  };
+  expertise: string;
+  content_style: string;
+  uniqueness: string;
+  interests: string;
+  appeal_points: string;
 }
 
 const WorkDetail = () => {
@@ -63,27 +58,43 @@ const WorkDetail = () => {
 
   useEffect(() => {
     const fetchWorkDetails = async () => {
-      if (!id) return;
+      if (!id) {
+        toast.error({ 
+          title: '作品IDが指定されていません', 
+          description: '正しいURLでアクセスしてください'
+        });
+        setLoading(false);
+        return;
+      }
       
       try {
         setLoading(true);
         
-        // 作品データの取得
-        const { data: workData, error: workError } = await supabase
-          .from('works')
-          .select('*')
-          .eq('id', id)
-          .single();
+        // 管理者権限で作品データを取得
+        const { data: workData, error: workError } = await fetchWorkWithAdmin(id);
         
         if (workError) {
-          throw workError;
+          console.error('作品詳細取得エラー:', workError);
+          toast.error({ 
+            title: '作品の読み込みに失敗しました', 
+            description: '作品が見つからないか、アクセスできません' 
+          });
+          setLoading(false);
+          return;
         }
         
-        // タグの取得
-        const { data: tagData, error: tagError } = await supabase
-          .from('work_tags')
-          .select('tag_id, tags(id, name)')  // tagsテーブルとJOINしてnameを取得
-          .eq('work_id', id);
+        if (!workData) {
+          console.error('作品データが見つかりません:', id);
+          toast.error({ 
+            title: '作品が見つかりません', 
+            description: '指定された作品は存在しないか、削除された可能性があります' 
+          });
+          setLoading(false);
+          return;
+        }
+        
+        // 管理者権限でタグデータを取得
+        const { data: tagData, error: tagError } = await fetchWorkTagsWithAdmin(id);
         
         if (tagError) {
           console.error('タグ取得エラー:', tagError);
@@ -110,12 +121,8 @@ const WorkDetail = () => {
         const { data: { user } } = await supabase.auth.getUser();
         setIsOwner(user?.id === workWithTags.user_id);
         
-        // AI分析結果の取得
-        const { data: analysisData, error: analysisError } = await supabase
-          .from('work_analysis')
-          .select('*')
-          .eq('work_id', id)
-          .single();
+        // 管理者権限でAI分析結果を取得
+        const { data: analysisData, error: analysisError } = await fetchWorkAnalysisWithAdmin(id);
         
         if (analysisError) {
           console.error('分析結果取得エラー:', analysisError);
@@ -124,14 +131,12 @@ const WorkDetail = () => {
           setAnalysisResult(analysisData.result);
         }
         
-        // 関連作品の取得（同じユーザーの他の作品）
+        // 管理者権限で関連作品を取得
         if (workWithTags.user_id) {
-          const { data: relatedData, error: relatedError } = await supabase
-            .from('works')
-            .select('*')
-            .eq('user_id', workWithTags.user_id)
-            .neq('id', id)
-            .limit(3);
+          const { data: relatedData, error: relatedError } = await fetchRelatedWorksWithAdmin(
+            workWithTags.user_id, 
+            id
+          );
           
           if (relatedError) {
             console.error('関連作品取得エラー:', relatedError);
@@ -142,7 +147,7 @@ const WorkDetail = () => {
         
       } catch (error) {
         console.error('作品詳細取得エラー:', error);
-        toast.error({ title: '作品の読み込みに失敗しました' });
+        toast.error({ title: '作品の読み込みに失敗しました', description: '作品が見つからないか、アクセスできません' });
       } finally {
         setLoading(false);
       }
@@ -272,71 +277,35 @@ const WorkDetail = () => {
                 
                 {analysisResult.expertise && (
                   <>
-                    <p className="text-gray-700 mb-4">{analysisResult.expertise.summary}</p>
-                    <div className="space-y-2">
-                      {analysisResult.expertise.categories.map((category, index) => (
-                        <div key={index} className="flex items-center">
-                          <span className="text-sm text-gray-700 w-1/3">{category.name}</span>
-                          <div className="w-2/3 bg-gray-200 rounded-full h-2.5">
-                            <div 
-                              className="bg-indigo-600 h-2.5 rounded-full" 
-                              style={{ width: `${category.score * 100}%` }}
-                            ></div>
-                          </div>
-                        </div>
-                      ))}
-                    </div>
+                    <p className="text-gray-700 mb-4">{analysisResult.expertise}</p>
                   </>
                 )}
               </div>
               
-              {/* 文章スタイル分析 */}
+              {/* コンテンツスタイル */}
               <div className="bg-purple-50 rounded-lg p-4">
                 <h3 className="text-lg font-semibold text-gray-900 mb-3 flex items-center">
-                  <BookOpen className="w-5 h-5 mr-2 text-purple-600" />
-                  文章スタイル分析
+                  <Fingerprint className="w-5 h-5 mr-2 text-purple-600" />
+                  コンテンツスタイル
                 </h3>
                 
                 {analysisResult.content_style && (
                   <>
-                    <p className="text-gray-700 mb-4">{analysisResult.content_style.summary}</p>
-                    <div className="space-y-2">
-                      {analysisResult.content_style.features.map((feature, index) => (
-                        <div key={index} className="flex items-center">
-                          <span className="text-sm text-gray-700 w-1/3">{feature.name}</span>
-                          <div className="w-2/3 bg-gray-200 rounded-full h-2.5">
-                            <div 
-                              className="bg-purple-600 h-2.5 rounded-full" 
-                              style={{ width: `${feature.score * 100}%` }}
-                            ></div>
-                          </div>
-                        </div>
-                      ))}
-                    </div>
+                    <p className="text-gray-700 mb-4">{analysisResult.content_style}</p>
                   </>
                 )}
               </div>
               
-              {/* 興味・関心分析 */}
+              {/* 作品のユニークさ */}
               <div className="bg-teal-50 rounded-lg p-4">
                 <h3 className="text-lg font-semibold text-gray-900 mb-3 flex items-center">
                   <BookOpen className="w-5 h-5 mr-2 text-teal-600" />
-                  興味・関心分析
+                  作品のユニークさ
                 </h3>
                 
-                {analysisResult.interests && (
+                {analysisResult.uniqueness && (
                   <>
-                    <p className="text-gray-700 mb-4">{analysisResult.interests.summary}</p>
-                    <div className="flex flex-wrap">
-                      {analysisResult.interests.tags.map((tag, index) => (
-                        <Badge 
-                          key={index} 
-                          className="mr-2 mb-2 bg-teal-100 text-teal-800 border-teal-200"
-                        >
-                          {tag}
-                        </Badge>
-                      ))}
-                    </div>
+                    <p className="text-gray-700 mb-4">{analysisResult.uniqueness}</p>
                   </>
                 )}
               </div>

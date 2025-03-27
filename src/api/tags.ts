@@ -1,9 +1,31 @@
 import { supabase } from '../lib/supabase';
+import { createTagWithAdmin, testSupabaseAdminConnection } from '../lib/supabase-admin';
 
 // Netlify FunctionsのURL
 const NETLIFY_FUNCTIONS_BASE_URL = import.meta.env.PROD 
-  ? 'https://eclectic-queijadas-227e9b.netlify.app/.netlify/functions'
-  : '/.netlify/functions';
+  ? 'https://stupendous-llama-975208.netlify.app/.netlify/functions'
+  : 'http://localhost:8888/.netlify/functions';
+
+// 開発環境かどうかを判定
+const isDevelopment = !import.meta.env.PROD;
+
+// 環境変数の値をログに出力（デバッグ用）
+console.log('環境変数の確認:', {
+  VITE_SUPABASE_URL: import.meta.env.VITE_SUPABASE_URL ? import.meta.env.VITE_SUPABASE_URL.substring(0, 10) + '...' : '未設定',
+  VITE_SUPABASE_SERVICE_ROLE_KEY: import.meta.env.VITE_SUPABASE_SERVICE_ROLE_KEY ? '設定済み（長さ: ' + import.meta.env.VITE_SUPABASE_SERVICE_ROLE_KEY.length + '）' : '未設定',
+  isDevelopment
+});
+
+// Supabase管理者接続をテスト
+if (isDevelopment) {
+  testSupabaseAdminConnection()
+    .then(isConnected => {
+      console.log('Supabase管理者接続テスト結果:', isConnected ? '成功' : '失敗');
+    })
+    .catch(error => {
+      console.error('Supabase管理者接続テスト中にエラー:', error);
+    });
+}
 
 /**
  * タグを作成する関数
@@ -14,10 +36,6 @@ const NETLIFY_FUNCTIONS_BASE_URL = import.meta.env.PROD
 export async function createTag(name: string, category: string = 'user_generated'): Promise<{ id: string; name: string; category: string }> {
   try {
     console.log(`createTag関数が呼び出されました: name=${name}, category=${category}`);
-    console.log('環境変数の確認:', {
-      supabaseUrl: import.meta.env.VITE_SUPABASE_URL ? '設定済み' : '未設定',
-      supabaseServiceRoleKey: import.meta.env.VITE_SUPABASE_SERVICE_ROLE_KEY ? '設定済み' : '未設定'
-    });
     
     // 1. まず既存のタグを確認
     console.log('既存のタグを検索中...');
@@ -58,15 +76,39 @@ export async function createTag(name: string, category: string = 'user_generated
       return similarTags[0];
     }
     
-    // 3. 新しいタグを作成（Netlify Functionsを使用）
-    console.log('新しいタグを作成中（Netlify Functions使用）...');
-    const tagData = { 
-      name, 
-      category
-    };
-    console.log('作成するタグデータ:', tagData);
+    // 3. 新しいタグを作成
+    console.log('新しいタグを作成中...');
     
-    // Netlify Functionsを使用してタグを作成
+    // 開発環境では直接Supabaseを使用し、本番環境ではNetlify Functionsを使用
+    if (isDevelopment) {
+      console.log('開発環境: 管理者クライアントを使用してタグを作成します');
+      const newTag = await createTagWithAdmin(name, category);
+      console.log('管理者クライアントでタグが正常に作成されました:', newTag);
+      return newTag;
+    } else {
+      // 本番環境: Netlify Functionsを使用
+      return await createTagWithNetlifyFunction(name, category);
+    }
+  } catch (error) {
+    console.error('Error in createTag function:', error);
+    throw error;
+  }
+}
+
+/**
+ * Netlify Functionsを使用してタグを作成する関数
+ * @param name タグ名
+ * @param category タグカテゴリ
+ * @returns 作成されたタグ
+ */
+async function createTagWithNetlifyFunction(name: string, category: string): Promise<{ id: string; name: string; category: string }> {
+  console.log('Netlify Functionsを使用してタグを作成します');
+  const tagData = { 
+    name, 
+    category
+  };
+  
+  try {
     const response = await fetch(`${NETLIFY_FUNCTIONS_BASE_URL}/create-tag`, {
       method: 'POST',
       headers: {
@@ -76,22 +118,16 @@ export async function createTag(name: string, category: string = 'user_generated
     });
     
     if (!response.ok) {
-      const errorData = await response.json().catch(() => ({}));
-      console.error(`Error creating tag with Netlify Function: ${response.status}`, errorData);
-      throw new Error(`タグの作成中にエラーが発生しました: ${errorData.error || response.statusText}`);
+      const errorText = await response.text();
+      console.error(`Error creating tag with Netlify Function: ${response.status}`, errorText);
+      throw new Error(`タグの作成中にエラーが発生しました: ${response.status} ${errorText}`);
     }
     
     const newTag = await response.json();
-    
-    if (!newTag || !newTag.id) {
-      console.error('タグ作成結果が空です');
-      throw new Error('タグの作成に失敗しました: レスポンスが空です');
-    }
-    
-    console.log('新しいタグが正常に作成されました:', newTag);
+    console.log('Netlify Functionsでタグが正常に作成されました:', newTag);
     return newTag;
   } catch (error) {
-    console.error('Error in createTag function:', error);
-    throw error;
+    console.error('Error creating tag with Netlify Function:', error);
+    throw new Error(`Netlify Functionsでのタグ作成中にエラーが発生しました: ${error instanceof Error ? error.message : String(error)}`);
   }
 }

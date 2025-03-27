@@ -5,9 +5,57 @@
     <link rel="icon" type="image/svg+xml" href="/vite.svg" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
     <title>Vite + React + TS</title>
+    <style>
+      #error-container {
+        position: fixed;
+        bottom: 0;
+        left: 0;
+        width: 100%;
+        max-height: 200px;
+        overflow-y: auto;
+        background-color: rgba(255, 0, 0, 0.1);
+        border-top: 1px solid #ff0000;
+        color: #ff0000;
+        padding: 10px;
+        font-family: monospace;
+        font-size: 12px;
+        z-index: 9999;
+        white-space: pre-wrap;
+        display: none;
+      }
+    </style>
   </head>
   <body>
     <div id="root"></div>
+    <div id="error-container"></div>
+    <script>
+      // エラーをキャプチャして表示するための処理
+      window.addEventListener('error', function(event) {
+        const errorContainer = document.getElementById('error-container');
+        errorContainer.style.display = 'block';
+        const errorDetails = document.createElement('div');
+        errorDetails.innerHTML = `<strong>エラー:</strong> ${event.error?.message || event.message}<br>
+        <strong>場所:</strong> ${event.filename}:${event.lineno}:${event.colno}<br>
+        <strong>スタック:</strong> ${event.error?.stack || 'スタック情報なし'}<br>
+        ---`;
+        errorContainer.appendChild(errorDetails);
+        console.error(event.error || event.message);
+      });
+
+      // すべてのコンソールエラーをキャプチャ
+      const originalConsoleError = console.error;
+      console.error = function() {
+        const errorContainer = document.getElementById('error-container');
+        errorContainer.style.display = 'block';
+        const errorMsg = Array.from(arguments).map(arg => 
+          typeof arg === 'object' ? JSON.stringify(arg, null, 2) : String(arg)
+        ).join(' ');
+        const errorDetails = document.createElement('div');
+        errorDetails.innerHTML = `<strong>コンソールエラー:</strong> ${errorMsg}<br>---`;
+        errorContainer.appendChild(errorDetails);
+        originalConsoleError.apply(console, arguments);
+      };
+    </script>
     <script type="module" src="/src/main.tsx"></script>
   </body>
 </html>

@@ -343,9 +343,9 @@ export function WorkCreate() {
     // タグの設定（カンマ区切りの文字列に変換）
     if (result.tags && result.tags.length > 0) {
       const tagString = result.tags
-        .sort((a, b) => b.relevance - a.relevance) // 関連度の高い順にソート
+        .sort((a: { relevance: number }, b: { relevance: number }) => b.relevance - a.relevance) // 関連度の高い順にソート
         .slice(0, 5) // 上位5つのタグを選択
-        .map(tag => tag.name)
+        .map((tag: { name: string }) => tag.name)
         .join(', ');
       
       setForm(prev => ({
@@ -362,9 +362,9 @@ export function WorkCreate() {
   const handleTagAnalysisComplete = (tags: Array<{name: string; relevance: number}>) => {
     if (tags && tags.length > 0) {
       const tagString = tags
-        .sort((a, b) => b.relevance - a.relevance)
+        .sort((a: { relevance: number }, b: { relevance: number }) => b.relevance - a.relevance)
         .slice(0, 5)
-        .map(tag => tag.name)
+        .map((tag: { name: string }) => tag.name)
         .join(', ');
       
       setForm(prev => ({

@@ -80,7 +80,7 @@ export async function analyzeUserData(works: Work[]): Promise<AIAnalysisResult> 
       expertise,
       uniqueness,
       interests,
-      talent: generateTalentSummary(expertise, uniqueness),
+      talent: generateTalentSummary(expertise),
       specialties: generateSpecialties(tagCounts),
       designStyles: generateDesignStyles(works)
     };
@@ -368,7 +368,7 @@ function identifyUniqueTraits(works: Work[], tags: string[]): string[] {
 }
 
 // 才能の要約を生成する関数
-function generateTalentSummary(expertise: AIAnalysisResult['expertise'], uniqueness: AIAnalysisResult['uniqueness']): string {
+function generateTalentSummary(expertise: AIAnalysisResult['expertise']): string {
   // 作品数に基づいて経験レベルを判断
   const experienceLevel = expertise.level > 5 ? "豊富な" : expertise.level > 3 ? "一定の" : "基本的な";
   

@@ -88,3 +88,62 @@ export async function saveUserInsights(
     return { success: false, error: error instanceof Error ? error.message : String(error) };
   }
 }
+
+/**
+ * ユーザーインサイトを取得する関数
+ * @param userId ユーザーID
+ * @returns 取得結果
+ */
+export async function getUserInsightsApi(
+  userId: string
+): Promise<{ 
+  success: boolean; 
+  data?: { 
+    expertise: string[]; 
+    style: string[]; 
+    interests: string[]; 
+  }; 
+  error?: string 
+}> {
+  try {
+    console.log('Fetching user insights for user:', userId);
+    
+    // ユーザーインサイトを取得
+    const { data, error } = await supabase
+      .from('user_insights')
+      .select('*')
+      .eq('user_id', userId)
+      .maybeSingle();
+    
+    if (error) {
+      console.error('Error fetching user insights:', error);
+      return { success: false, error: error.message };
+    }
+    
+    if (!data) {
+      console.log('No insights found for user:', userId);
+      return { 
+        success: false, 
+        error: 'No insights found for this user' 
+      };
+    }
+    
+    console.log('User insights fetched successfully:', data);
+    
+    // データを整形して返す
+    return { 
+      success: true, 
+      data: {
+        expertise: data.specialties || [],
+        style: data.design_styles || [],
+        interests: data.interests?.areas || []
+      }
+    };
+  } catch (error) {
+    console.error('Error in getUserInsightsApi:', error);
+    return { 
+      success: false, 
+      error: error instanceof Error ? error.message : String(error) 
+    };
+  }
+}

@@ -6,6 +6,8 @@ const supabaseAnonKey = import.meta.env.VITE_SUPABASE_ANON_KEY || '';
 
 if (!supabaseUrl || !supabaseAnonKey) {
   console.error('Missing Supabase environment variables');
+  console.log('VITE_SUPABASE_URL:', supabaseUrl);
+  console.log('VITE_SUPABASE_ANON_KEY:', supabaseAnonKey ? 'exists' : 'missing');
 }
 
 // Supabaseクライアントの作成
@@ -13,16 +15,7 @@ export const supabase = createClient(supabaseUrl, supabaseAnonKey, {
   auth: {
     persistSession: true,
     autoRefreshToken: true,
-  },
-  global: {
-    // リトライ設定を追加
-    fetch: (url, options) => {
-      return fetch(url, {
-        ...options,
-        // タイムアウトを30秒に設定
-        signal: options?.signal || AbortSignal.timeout(30000),
-      });
-    },
+    storage: localStorage,
   },
 });
 

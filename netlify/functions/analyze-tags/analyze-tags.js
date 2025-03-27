@@ -1,247 +1,437 @@
 // Netlify Function: analyze-tags
-// タグ分析を行うNetlify Function
-
+// ユーザーのタグを分析するNetlify Function
 const { createClient } = require('@supabase/supabase-js');
 const fetch = require('node-fetch');
 
-// Supabaseクライアントの初期化
-const supabaseUrl = process.env.VITE_SUPABASE_URL;
-const supabaseAnonKey = process.env.VITE_SUPABASE_ANON_KEY;
-const supabase = createClient(supabaseUrl, supabaseAnonKey);
-
-// Google Gemini APIキー
-const geminiApiKey = process.env.VITE_GEMINI_API_KEY;
-const geminiApiUrl = 'https://generativelanguage.googleapis.com/v1beta/models/gemini-pro:generateContent';
-
-// CORSヘッダー設定
-const headers = {
-  'Access-Control-Allow-Origin': '*',
-  'Access-Control-Allow-Headers': 'Content-Type',
-  'Access-Control-Allow-Methods': 'GET, POST, OPTIONS'
-};
-
-exports.handler = async (event, context) => {
-  // OPTIONSリクエスト（プリフライト）の処理
-  if (event.httpMethod === 'OPTIONS') {
-    return {
-      statusCode: 200,
-      headers,
-      body: JSON.stringify({ message: 'CORS preflight successful' })
-    };
-  }
-
-  // POSTリクエスト以外は拒否
-  if (event.httpMethod !== 'POST') {
-    return {
-      statusCode: 405,
-      headers,
-      body: JSON.stringify({ error: 'Method Not Allowed' })
-    };
-  }
-
+exports.handler = async function(event, context) {
   try {
-    // リクエストボディの解析
-    const requestBody = JSON.parse(event.body);
-    const { userId } = requestBody;
-
-    if (!userId) {
-      return {
-        statusCode: 400,
-        headers,
-        body: JSON.stringify({ error: 'User ID is required' })
-      };
-    }
-
-    // ユーザーの作品を取得
-    const { data: works, error: worksError } = await supabase
-      .from('works')
-      .select('id, title, description, source_url')
-      .eq('user_id', userId);
-
-    if (worksError) {
-      console.error('Error fetching works:', worksError);
+    // 環境変数からSupabase設定を取得
+    const supabaseUrl = process.env.SUPABASE_URL;
+    const supabaseServiceKey = process.env.SUPABASE_SERVICE_ROLE_KEY;
+    const geminiApiKey = process.env.GEMINI_API_KEY;
+    
+    console.log('環境変数の詳細情報:');
+    console.log('SUPABASE_URL:', supabaseUrl ? '設定済み' : '未設定');
+    console.log('SUPABASE_SERVICE_ROLE_KEY:', supabaseServiceKey ? '設定済み (最初の10文字: ' + supabaseServiceKey.substring(0, 10) + '...)' : '未設定');
+    console.log('GEMINI_API_KEY 設定状況:', geminiApiKey ? '設定済み' : '未設定');
+    
+    // 環境変数が設定されているか確認
+    if (!supabaseUrl || !supabaseServiceKey) {
+      console.error('Supabase環境変数が設定されていません');
       return {
         statusCode: 500,
-        headers,
-        body: JSON.stringify({ error: 'Failed to fetch user works' })
+        body: JSON.stringify({ 
+          error: 'Supabase環境変数が設定されていません',
+          details: {
+            supabaseUrl: supabaseUrl ? '設定済み' : '未設定',
+            supabaseServiceKey: supabaseServiceKey ? '設定済み' : '未設定'
+          }
+        })
+      };
+    }
+    
+    // Supabaseクライアントの初期化（サービスロールキーを使用）
+    console.log('Supabaseクライアントを初期化します (サービスロールキー使用)...');
+    const supabase = createClient(supabaseUrl, supabaseServiceKey, {
+      auth: {
+        autoRefreshToken: false,
+        persistSession: false
+      }
+    });
+    
+    // テスト接続
+    console.log('Supabase接続テスト実行中...');
+    const { data: testData, error: testError } = await supabase
+      .from('tags')
+      .select('id')
+      .limit(1);
+      
+    if (testError) {
+      console.error('Supabase接続テストに失敗:', testError);
+      return {
+        statusCode: 500,
+        body: JSON.stringify({ 
+          error: `Supabase接続テストに失敗: ${testError.message}`,
+          details: testError
+        })
+      };
+    }
+    
+    console.log('Supabase接続テスト成功:', testData);
+
+    // リクエストボディの解析
+    const { body } = event;
+    let requestData;
+    
+    try {
+      requestData = JSON.parse(body);
+      console.log('リクエストデータ:', requestData);
+    } catch (error) {
+      console.error('リクエストボディの解析に失敗:', error);
+      return {
+        statusCode: 400,
+        body: JSON.stringify({ error: 'リクエストボディの解析に失敗しました' })
       };
     }
 
-    if (!works || works.length === 0) {
+    // ユーザーIDの取得
+    const { userId } = requestData;
+    
+    if (!userId) {
+      console.error('ユーザーIDが指定されていません');
+      return {
+        statusCode: 400,
+        body: JSON.stringify({ error: 'ユーザーIDは必須です' })
+      };
+    }
+
+    // ユーザーのタグを取得
+    console.log(`ユーザー ${userId} のタグを取得中...`);
+    
+    // ユーザーの作品に関連付けられたタグを取得
+    const { data: userWorks, error: worksError } = await supabase
+      .from('works')
+      .select('id')
+      .eq('user_id', userId);
+    
+    if (worksError) {
+      console.error('ユーザー作品の取得中にエラーが発生しました:', worksError);
+      return {
+        statusCode: 500,
+        body: JSON.stringify({ 
+          error: `ユーザー作品の取得中にエラーが発生しました: ${worksError.message}`,
+          details: worksError
+        })
+      };
+    }
+    
+    if (!userWorks || userWorks.length === 0) {
+      console.log(`ユーザー ${userId} の作品が見つかりませんでした`);
       return {
         statusCode: 404,
-        headers,
         body: JSON.stringify({ error: 'No works found for this user' })
       };
     }
-
-    // 各作品のタグを取得
-    const worksWithTags = await Promise.all(works.map(async (work) => {
-      const { data: tags, error: tagsError } = await supabase
-        .from('work_tags_with_names')
-        .select('tag_name')
-        .eq('work_id', work.id);
-
-      if (tagsError) {
-        console.error(`Error fetching tags for work ${work.id}:`, tagsError);
-        return { ...work, tags: [] };
-      }
-
+    
+    console.log(`${userWorks.length} 件のユーザー作品が見つかりました`);
+    
+    // 作品IDのリストを作成
+    const workIds = userWorks.map(work => work.id);
+    
+    // 作品に関連付けられたタグを取得
+    const { data: workTags, error: workTagsError } = await supabase
+      .from('work_tags')
+      .select('tag_id')
+      .in('work_id', workIds);
+    
+    if (workTagsError) {
+      console.error('作品タグの取得中にエラーが発生しました:', workTagsError);
       return {
-        ...work,
-        tags: tags ? tags.map(tag => tag.tag_name) : []
+        statusCode: 500,
+        body: JSON.stringify({ 
+          error: `作品タグの取得中にエラーが発生しました: ${workTagsError.message}`,
+          details: workTagsError
+        })
       };
-    }));
-
-    // タグの出現頻度を計算
-    const tagFrequency = {};
-    worksWithTags.forEach(work => {
-      if (work.tags && work.tags.length > 0) {
-        work.tags.forEach(tag => {
-          tagFrequency[tag] = (tagFrequency[tag] || 0) + 1;
-        });
+    }
+    
+    if (!workTags || workTags.length === 0) {
+      console.log('ユーザーの作品にタグが見つかりませんでした');
+      return {
+        statusCode: 404,
+        body: JSON.stringify({ 
+          error: 'No tags found for this user\'s works',
+          message: 'タグが見つかりませんでした。作品にタグを追加してから再度お試しください。'
+        })
+      };
+    }
+    
+    // タグIDのリストを作成（重複を排除）
+    const tagIds = [...new Set(workTags.map(item => item.tag_id))];
+    console.log(`${tagIds.length} 件のユニークなタグIDが見つかりました`);
+    
+    // タグ情報を取得
+    const { data: userTags, error: tagsError } = await supabase
+      .from('tags')
+      .select('id, name, category')
+      .in('id', tagIds);
+    
+    if (tagsError) {
+      console.error('タグ情報の取得中にエラーが発生しました:', tagsError);
+      return {
+        statusCode: 500,
+        body: JSON.stringify({ 
+          error: `タグ情報の取得中にエラーが発生しました: ${tagsError.message}`,
+          details: tagsError
+        })
+      };
+    }
+    
+    console.log(`${userTags.length} 件のユーザータグが見つかりました`);
+    
+    // タグをカテゴリごとに分類
+    const tagsByCategory = {};
+    userTags.forEach(userTag => {
+      const tag = userTag;
+      if (tag) {
+        if (!tagsByCategory[tag.category]) {
+          tagsByCategory[tag.category] = [];
+        }
+        tagsByCategory[tag.category].push(tag.name);
       }
     });
-
-    // タグの分析データを準備
-    const tagAnalysisData = {
-      works: worksWithTags,
-      tagFrequency,
-      totalWorks: worksWithTags.length
-    };
-
-    // Google Gemini APIを使用してタグを分析
-    const prompt = `
-あなたはクリエイターのポートフォリオを分析するAIアシスタントです。
-以下のデータはユーザーの作品とそれに関連するタグのリストです。
-このデータを分析して、以下の観点からユーザーの特徴を抽出してください。
-
-作品データ:
-${JSON.stringify(tagAnalysisData, null, 2)}
-
-以下の形式でJSON形式で回答してください:
-{
-  "expertise": {
-    "summary": "ユーザーの専門性に関する分析（200文字以内）"
-  },
-  "uniqueness": {
-    "summary": "ユーザーの作品の個性や独自性に関する分析（200文字以内）"
-  },
-  "talent": {
-    "summary": "ユーザーのコンテンツスタイルや才能に関する分析（200文字以内）"
-  },
-  "specialties": ["専門分野1", "専門分野2", "専門分野3"],
-  "interests": {
-    "topics": ["興味・関心のある分野1", "興味・関心のある分野2", "興味・関心のある分野3"]
-  },
-  "clusters": [
-    {
-      "name": "クラスター1の名前",
-      "tags": ["タグ1", "タグ2", "タグ3"]
-    },
-    {
-      "name": "クラスター2の名前",
-      "tags": ["タグ4", "タグ5", "タグ6"]
+    
+    console.log('カテゴリ別タグ:', tagsByCategory);
+    
+    // ユーザーの作品を取得
+    console.log(`ユーザー ${userId} の作品を取得中...`);
+    const { data: userWorksData, error: worksDataError } = await supabase
+      .from('works')
+      .select('id, title, description')
+      .eq('user_id', userId);
+    
+    if (worksDataError) {
+      console.error('ユーザー作品の取得中にエラーが発生しました:', worksDataError);
+      return {
+        statusCode: 500,
+        body: JSON.stringify({ 
+          error: `ユーザー作品の取得中にエラーが発生しました: ${worksDataError.message}`,
+          details: worksDataError
+        })
+      };
     }
-  ]
-}
+    
+    if (!userWorksData || userWorksData.length === 0) {
+      console.log(`ユーザー ${userId} の作品が見つかりませんでした`);
+      return {
+        statusCode: 404,
+        body: JSON.stringify({ error: 'No works found for this user' })
+      };
+    }
+    
+    console.log(`${userWorksData.length} 件のユーザー作品が見つかりました`);
+    
+    // タグの分析
+    const tagAnalysisPrompt = `
+あなたはライターやクリエイターのタグを分析するAIアシスタントです。
+以下のタグリストを分析して、ユーザーの「専門性」「コンテンツスタイル」「作品のユニークさ」を日本語で詳細に分析してください。
 
-必ず有効なJSON形式で回答してください。日本語で回答してください。
+【タグリスト】
+${Object.entries(tagsByCategory)
+  .map(([category, tags]) => `${category}: ${tags.join(', ')}`)
+  .join('\n')}
+
+【作品情報】
+${userWorksData.map(work => `タイトル: ${work.title}\n説明: ${work.description || 'なし'}`).join('\n\n')}
+
+以下の3つの観点から分析し、JSONフォーマットで回答してください：
+
+1. 専門性: ユーザーの専門知識や得意分野を分析
+2. コンテンツスタイル: ユーザーの表現スタイルや文章の特徴を分析
+3. 作品のユニークさ: ユーザーの作品が持つ独自性や特徴を分析
+
+回答は以下のJSON形式で返してください：
+{
+  "expertise": "専門性の詳細な分析（1つの文章）",
+  "contentStyle": "コンテンツスタイルの詳細な分析（1つの文章）",
+  "uniqueness": "作品のユニークさの詳細な分析（1つの文章）"
+}
 `;
 
-    // Gemini APIリクエスト
-    const geminiResponse = await fetch(`${geminiApiUrl}?key=${geminiApiKey}`, {
-      method: 'POST',
-      headers: {
-        'Content-Type': 'application/json'
-      },
-      body: JSON.stringify({
-        contents: [
-          {
-            parts: [
-              { text: prompt }
-            ]
+    // Gemini APIキーが設定されているか確認
+    if (!geminiApiKey) {
+      console.error('GEMINI_API_KEYが設定されていません');
+      return {
+        statusCode: 500,
+        body: JSON.stringify({ error: 'GEMINI_API_KEYが設定されていません' })
+      };
+    }
+
+    // Gemini APIを呼び出して分析
+    console.log('Gemini APIを呼び出して分析中...');
+    const geminiResponse = await fetch(
+      'https://generativelanguage.googleapis.com/v1/models/gemini-1.5-flash:generateContent?key=' + geminiApiKey,
+      {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json'
+        },
+        body: JSON.stringify({
+          contents: [
+            {
+              parts: [
+                { text: tagAnalysisPrompt }
+              ]
+            }
+          ],
+          generationConfig: {
+            temperature: 0.2,
+            topK: 40,
+            topP: 0.95,
+            maxOutputTokens: 1024
           }
-        ],
-        generationConfig: {
-          temperature: 0.2,
-          topK: 40,
-          topP: 0.95,
-          maxOutputTokens: 2048
-        }
-      })
-    });
+        })
+      }
+    );
 
     if (!geminiResponse.ok) {
-      const errorData = await geminiResponse.json();
-      console.error('Gemini API error:', errorData);
+      const errorText = await geminiResponse.text();
+      console.error('Gemini APIの呼び出しに失敗:', errorText);
       return {
-        statusCode: geminiResponse.status,
-        headers,
-        body: JSON.stringify({ error: 'Failed to analyze tags with AI' })
+        statusCode: 500,
+        body: JSON.stringify({ 
+          error: `Gemini APIの呼び出しに失敗: ${geminiResponse.status} ${geminiResponse.statusText}`,
+          details: errorText
+        })
       };
     }
 
     const geminiData = await geminiResponse.json();
+    console.log('Gemini API レスポンス:', JSON.stringify(geminiData, null, 2));
     
-    // Gemini APIからの応答を解析
-    let analysisResult;
-    try {
-      const responseText = geminiData.candidates[0].content.parts[0].text;
-      // JSONブロックを抽出
-      const jsonMatch = responseText.match(/```json\n([\s\S]*?)\n```/) || 
-                        responseText.match(/```\n([\s\S]*?)\n```/) ||
-                        responseText.match(/{[\s\S]*?}/);
-                        
-      const jsonText = jsonMatch ? jsonMatch[1] || jsonMatch[0] : responseText;
-      analysisResult = JSON.parse(jsonText.replace(/```/g, '').trim());
-    } catch (parseError) {
-      console.error('Error parsing AI response:', parseError);
+    if (!geminiData.candidates || geminiData.candidates.length === 0) {
+      console.error('Gemini APIからの応答が空です');
       return {
         statusCode: 500,
-        headers,
-        body: JSON.stringify({ error: 'Failed to parse AI analysis result' })
+        body: JSON.stringify({ error: 'Gemini APIからの応答が空です' })
       };
     }
 
-    // 分析結果をデータベースに保存
+    // Gemini APIのレスポンスからテキスト部分を抽出
+    const responseText = geminiData.candidates[0].content.parts[0].text;
+    console.log('分析結果テキスト:', responseText);
+    
+    // JSON部分を抽出して解析
+    let insights;
     try {
-      const { error: saveError } = await supabase
-        .from('user_insights')
-        .upsert({
-          user_id: userId,
-          expertise: analysisResult.expertise,
-          talent: analysisResult.talent,
-          uniqueness: analysisResult.uniqueness,
-          specialties: analysisResult.specialties || [],
-          interests: analysisResult.interests,
-          design_styles: [],
-          updated_at: new Date().toISOString()
-        });
-
-      if (saveError) {
-        console.error('Error saving user insights:', saveError);
+      // テキストからJSON部分を抽出
+      const jsonMatch = responseText.match(/\{[\s\S]*\}/);
+      if (jsonMatch) {
+        insights = JSON.parse(jsonMatch[0]);
+      } else {
+        throw new Error('JSONが見つかりませんでした');
       }
-    } catch (saveError) {
-      console.error('Error in saving user insights:', saveError);
+    } catch (error) {
+      console.error('分析結果の解析に失敗:', error);
+      
+      // JSONの解析に失敗した場合は、デフォルトの構造を作成
+      insights = {
+        expertise: "タグ情報からユーザーの専門性を判断できませんでした。",
+        contentStyle: "タグ情報からコンテンツスタイルを判断できませんでした。",
+        uniqueness: "タグ情報から作品のユニークさを判断できませんでした。"
+      };
+      
+      // テキストを行ごとに分割して、カテゴリに振り分ける
+      const lines = responseText.split('\n');
+      let currentCategory = null;
+      
+      for (const line of lines) {
+        if (line.includes('専門性')) {
+          currentCategory = 'expertise';
+          continue;
+        } else if (line.includes('コンテンツスタイル') || line.includes('スタイル')) {
+          currentCategory = 'contentStyle';
+          continue;
+        } else if (line.includes('作品のユニークさ') || line.includes('ユニークさ') || line.includes('独自性')) {
+          currentCategory = 'uniqueness';
+          continue;
+        }
+        
+        if (currentCategory && line.trim()) {
+          // 行頭の記号や番号を削除
+          const cleanedLine = line.replace(/^[•\-\d\.\s]+/, '').trim();
+          if (cleanedLine) {
+            insights[currentCategory] = cleanedLine;
+          }
+        }
+      }
     }
-
-    // 成功レスポンスを返す
+    
+    console.log('分析結果:', insights);
+    
+    // ユーザーインサイトを保存
+    console.log(`ユーザー ${userId} のインサイトを保存中...`);
+    console.log('保存するデータ:', {
+      user_id: userId,
+      expertise: {
+        summary: insights.expertise
+      },
+      content_style: {
+        summary: insights.contentStyle
+      },
+      uniqueness: {
+        summary: insights.uniqueness
+      }
+    });
+    
+    const { data: upsertData, error: upsertError } = await supabase
+      .from('user_insights')
+      .upsert({
+        user_id: userId,
+        expertise: {
+          summary: insights.expertise
+        },
+        content_style: {
+          summary: insights.contentStyle
+        },
+        uniqueness: {
+          summary: insights.uniqueness
+        },
+        updated_at: new Date().toISOString()
+      });
+    
+    if (upsertError) {
+      console.error('インサイトの保存中にエラーが発生しました:', upsertError);
+      console.error('エラーの詳細:', JSON.stringify(upsertError, null, 2));
+      // インサイトの保存に失敗しても、分析結果は返す
+      console.log('インサイトの保存に失敗しましたが、分析結果を返します');
+    } else {
+      console.log('インサイトが正常に保存されました:', upsertData);
+    }
+    
+    // 分析結果を返す
     return {
       statusCode: 200,
-      headers,
       body: JSON.stringify({
-        success: true,
-        data: analysisResult
+        message: '分析が完了しました',
+        data: {
+          expertise: {
+            summary: insights.expertise
+          },
+          content_style: {
+            summary: insights.contentStyle
+          },
+          uniqueness: {
+            summary: insights.uniqueness
+          }
+        }
       })
     };
-
   } catch (error) {
-    console.error('Function error:', error);
+    console.error('予期せぬエラーが発生しました:', error);
+    // エラーオブジェクトの詳細情報を取得
+    const errorDetails = {
+      message: error.message || '不明なエラー',
+      stack: error.stack,
+      name: error.name,
+      code: error.code,
+      // エラーオブジェクトの全プロパティを取得
+      properties: Object.getOwnPropertyNames(error).reduce((obj, prop) => {
+        try {
+          obj[prop] = error[prop];
+        } catch (e) {
+          obj[prop] = 'アクセスできないプロパティ';
+        }
+        return obj;
+      }, {})
+    };
+    
     return {
       statusCode: 500,
-      headers,
-      body: JSON.stringify({ error: 'Internal Server Error' })
+      body: JSON.stringify({ 
+        error: `予期せぬエラーが発生しました: ${error.message || '不明なエラー'}`,
+        details: errorDetails
+      })
     };
   }
 };
