@@ -64,13 +64,14 @@ function LandingPage() {
       <header className="container mx-auto px-4 py-16 sm:px-6 lg:px-8">
         <div className="text-center">
           <h1 className="text-4xl font-bold tracking-tight text-gray-900 sm:text-6xl">
-            <span className="text-indigo-600">AIが</span>あなたの真価を<span className="text-indigo-600">発見・証明</span>
+            <span className="text-indigo-600">AIが</span>作品の新しい魅力を<span className="text-indigo-600">発見・証明</span>
             <span className="block mt-2">ミスマッチのない最適な仕事と出会う</span>
           </h1>
           <p className="mt-6 text-lg leading-8 text-gray-600">
-            クリエイターの才能は、時に自分自身では気づかないもの。<br />
-            Baluboは<span className="text-indigo-600">AI分析</span>であなたの作品から隠れた強みを可視化し、<br />
-            <span className="text-indigo-600">客観的な自己理解</span>と<span className="text-indigo-600">最適なマッチング</span>を実現するポートフォリオサービスです。
+            Baluboは<span className="text-indigo-600">「AIによる作品分析」</span>を通じて、<br />
+            クリエイターの<span className="text-indigo-600">魅力を客観的に発見・証明</span>するポートフォリオサービスです。<br />
+            ポートフォリオに「客観性」をもたらすことで、<br />
+            クリエイターと発注者のミスマッチを解決することを目指します。
           </p>
           <div className="mt-10 flex items-center justify-center gap-x-6">
             <button
