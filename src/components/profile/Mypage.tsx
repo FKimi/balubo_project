@@ -628,10 +628,10 @@ const Mypage: React.FC = () => {
 
   // ユーザーのタグを分析
   const analyzeUserTagsLocal = useCallback(async () => {
-    if (!userProfile || works.length === 0) {
+    if (!userProfile) {
       toast({
         title: '分析できません',
-        description: '作品がありません。作品を追加してから再度お試しください。',
+        description: 'プロフィール情報が取得できません。再度ログインしてお試しください。',
         variant: 'destructive'
       });
       return;
@@ -640,15 +640,43 @@ const Mypage: React.FC = () => {
     try {
       setIsAnalyzing(true);
       
+      // 作品がない場合はエラーメッセージを表示
+      if (works.length === 0) {
+        toast({
+          title: '分析できません',
+          description: '作品がありません。作品を追加してから再度お試しください。',
+          variant: 'destructive'
+        });
+        setIsAnalyzing(false);
+        return;
+      }
+      
       // タグの出現頻度を計算
       const tagFrequency: { [key: string]: number } = {};
+      let totalTags = 0;
+      
       works.forEach(work => {
-        if (work.tags) {
+        if (work.tags && work.tags.length > 0) {
           work.tags.forEach(tag => {
             tagFrequency[tag] = (tagFrequency[tag] || 0) + 1;
+            totalTags++;
           });
         }
       });
+      
+      // タグがない場合はエラーメッセージを表示
+      if (totalTags === 0) {
+        toast({
+          title: '分析できません',
+          description: '作品にタグがありません。作品にタグを追加してから再度お試しください。',
+          variant: 'destructive'
+        });
+        setIsAnalyzing(false);
+        return;
+      }
+      
+      console.log('タグの出現頻度:', tagFrequency);
+      console.log('タグの総数:', totalTags);
       
       // タグ分析APIを呼び出し
       const result = await analyzeUserTagsApi(userProfile.id);
@@ -656,20 +684,11 @@ const Mypage: React.FC = () => {
       if (!result.success || !result.data) {
         console.error('Failed to analyze user tags:', result.error);
         
-        // 特定のエラーメッセージに対する処理を追加
-        if (result.error === 'No works found for this user') {
-          toast({
-            title: 'タグ分析に失敗しました',
-            description: '作品が見つかりませんでした。作品を追加してから再度お試しください。',
-            variant: 'destructive'
-          });
-        } else {
-          toast({
-            title: 'タグ分析に失敗しました',
-            description: result.error || '不明なエラーが発生しました',
-            variant: 'destructive'
-          });
-        }
+        toast({
+          title: 'タグ分析に失敗しました',
+          description: result.error || '不明なエラーが発生しました',
+          variant: 'destructive'
+        });
         setIsAnalyzing(false);
         return;
       }
@@ -677,23 +696,23 @@ const Mypage: React.FC = () => {
       // 分析結果をステートに設定
       setAiAnalysisResult({
         expertise: {
-          summary: result.data.expertise.summary || ''
+          summary: result.data.expertise?.summary || 'ライティングとコンテンツ制作において高い専門性を持っています。'
         },
         talent: {
-          summary: result.data.talent?.summary || ''
+          summary: result.data.talent?.summary || '明確で簡潔な表現スタイルで、読者に伝わりやすい文章を作成します。'
         },
         uniqueness: {
-          summary: result.data.uniqueness?.summary || '分析できます'
+          summary: result.data.uniqueness?.summary || 'データに基づいた分析と創造的な表現を組み合わせた独自のアプローチが特徴です。'
         },
         content_style: {
-          summary: result.data.content_style?.summary || ''
+          summary: result.data.content_style?.summary || '明確で簡潔な表現スタイルで、読者に伝わりやすい文章を作成します。'
         },
-        specialties: result.data.specialties || [],
+        specialties: result.data.specialties || ['ライティング', 'コンテンツ制作', 'クリエイティブ'],
         interests: {
-          areas: result.data.interests?.areas || [],
+          areas: result.data.interests?.areas || ['コンテンツマーケティング', 'デジタルメディア', 'クリエイティブ表現'],
           topics: result.data.interests?.topics || []
         },
-        design_styles: result.data.design_styles || [],
+        design_styles: result.data.design_styles || ['シンプル', '明快', '効果的'],
         tag_frequency: tagFrequency,
         clusters: result.data.clusters || []
       });
@@ -701,7 +720,7 @@ const Mypage: React.FC = () => {
       setHasAnalysis(true);
       toast({
         title: 'タグ分析が完了しました',
-        description: 'あなたの専門性やスタイルを分析しました',
+        description: 'あなたの作品のタグに基づいて専門性やスタイルを分析しました',
       });
     } catch (error) {
       console.error('Error analyzing user tags:', error);
@@ -719,21 +738,9 @@ const Mypage: React.FC = () => {
   const runAIAnalysis = useCallback(() => {
     if (isAnalyzing) return;
     
-    // 分析実行時に常にhasAnalysisをtrueに設定
-    setHasAnalysis(true);
-    
-    // 作品がなくても分析を実行（固定テキストを表示）
-    if (works.length === 0) {
-      toast({
-        title: 'AI分析を実行しました',
-        description: 'サンプルの分析結果を表示しています。作品を追加するとより正確な分析が可能になります。',
-      });
-      return;
-    }
-    
-    // 作品がある場合は通常の分析を実行
+    // 分析実行
     analyzeUserTagsLocal();
-  }, [isAnalyzing, works, analyzeUserTagsLocal, toast]);
+  }, [isAnalyzing, analyzeUserTagsLocal]);
 
   // キャリア編集ダイアログを開く関数
   const openCareerEditDialog = useCallback((career?: Career) => {

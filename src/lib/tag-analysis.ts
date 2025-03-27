@@ -31,7 +31,7 @@ export interface TagAnalysisResult {
   summary: string; // タグ分析の要約
 }
 
-// Gemini 2.0 Flashのモデル設定
+// Gemini 1.5 Flashのモデル設定
 const generationConfig = {
   temperature: 0.7, // タグ生成は少し創造性を抑える
   topP: 0.9,
@@ -57,10 +57,10 @@ export async function generateTags(input: TagGenerationInput): Promise<TagAnalys
     
     try {
       // モデル初期化前にログを追加
-      console.log("Initializing Gemini 2.0 Flash model...");
+      console.log("Initializing Gemini 1.5 Flash model...");
       
       const model = genAI.getGenerativeModel({
-        model: "gemini-2.0-flash",
+        model: "gemini-1.5-flash",
         generationConfig,
       });
 
@@ -101,11 +101,11 @@ export async function generateTags(input: TagGenerationInput): Promise<TagAnalys
       `;
 
       try {
-        console.log("Gemini API - Starting tag generation with 2.0-flash model...");
+        console.log("Gemini API - Starting tag generation with 1.5-flash model...");
         const result = await model.generateContent(prompt);
         const response = await result.response;
         const text = response.text();
-        console.log("Gemini API - Tag generation successful with 2.0-flash model");
+        console.log("Gemini API - Tag generation successful with 1.5-flash model");
 
         try {
           // Extract JSON from the response if it's wrapped in markdown code blocks
@@ -137,7 +137,7 @@ export async function generateTags(input: TagGenerationInput): Promise<TagAnalys
           return getFallbackTagAnalysis();
         }
       } catch (apiError) {
-        console.error('Gemini API error with 2.0-flash model:', apiError);
+        console.error('Gemini API error with 1.5-flash model:', apiError);
         // APIエラーの詳細をログに記録
         if (apiError instanceof Error) {
           console.error('Error details:', apiError.message, apiError.stack);
@@ -148,7 +148,7 @@ export async function generateTags(input: TagGenerationInput): Promise<TagAnalys
         throw apiError;
       }
     } catch (modelError) {
-      console.error('Error initializing or using Gemini 2.0 Flash model:', modelError);
+      console.error('Error initializing or using Gemini 1.5 Flash model:', modelError);
       console.warn('Falling back to gemini-1.0-pro model...');
       
       // フォールバック: gemini-1.0-proを使用
@@ -297,7 +297,7 @@ export async function clusterTags(tags: Array<{name: string; relevance: number}>
     // Initialize the API client
     const genAI = new GoogleGenerativeAI(GEMINI_API_KEY);
     const model = genAI.getGenerativeModel({
-      model: "gemini-2.0-flash",
+      model: "gemini-1.5-flash",
       generationConfig: {
         temperature: 0.2, // クラスタリングは創造性を抑える
         maxOutputTokens: 4096,

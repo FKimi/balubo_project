@@ -55,7 +55,7 @@ export async function analyzeContent(content: ContentInput): Promise<ContentAnal
     try {
       // Get the model - 最新のモデル名を使用
       const model = genAI.getGenerativeModel({
-        model: "gemini-1.5-pro",
+        model: "gemini-1.5-flash",
         generationConfig,
       });
 
@@ -120,7 +120,7 @@ ${contentText}
 - JSONのみを出力し、他の説明は含めないでください
 `;
 
-      console.log('Analyzing content with Gemini 1.5 Pro model...');
+      console.log('Analyzing content with Gemini 1.5 Flash model...');
       
       // Generate content
       const result = await model.generateContent(prompt);
@@ -175,7 +175,7 @@ ${contentText}
         throw new Error(`Failed to parse JSON from Gemini response: ${jsonError instanceof Error ? jsonError.message : String(jsonError)}`);
       }
     } catch (modelError) {
-      console.error('Gemini API error with 1.5 Pro model:', modelError instanceof Error ? modelError.message : String(modelError));
+      console.error('Gemini API error with 1.5 Flash model:', modelError instanceof Error ? modelError.message : String(modelError));
       
       // Fallback to gemini-1.0-pro model
       try {
@@ -259,7 +259,7 @@ ${contentText}
         };
       } catch (fallbackError) {
         console.error('Error with fallback model:', fallbackError instanceof Error ? fallbackError.message : String(fallbackError));
-        console.error('Error initializing or using Gemini 1.5 Pro model:', modelError instanceof Error ? modelError.message : String(modelError));
+        console.error('Error initializing or using Gemini 1.5 Flash model:', modelError instanceof Error ? modelError.message : String(modelError));
         // Return fallback analysis if both models fail
         return getFallbackAnalysis();
       }
@@ -316,13 +316,13 @@ export async function testGeminiAPI(): Promise<{ success: boolean; message: stri
     const genAI = new GoogleGenerativeAI(GEMINI_API_KEY);
     
     try {
-      // まずGemini 1.5 Proを試す
+      // まずGemini 1.5 Flashを試す
       const model = genAI.getGenerativeModel({
-        model: "gemini-1.5-pro",
+        model: "gemini-1.5-flash",
         generationConfig
       });
 
-      console.log("Testing Gemini 1.5 Pro API...");
+      console.log("Testing Gemini 1.5 Flash API...");
       // Simple test prompt
       const result = await model.generateContent("What is AI? Explain in one sentence.");
       const response = await result.response;
@@ -334,11 +334,11 @@ export async function testGeminiAPI(): Promise<{ success: boolean; message: stri
 
       return {
         success: true,
-        message: 'API test successful with gemini-1.5-pro',
+        message: 'API test successful with gemini-1.5-flash',
         response: text
       };
     } catch (error2) {
-      console.warn('Failed to use gemini-1.5-pro, falling back to gemini-1.0-pro:', error2);
+      console.warn('Failed to use gemini-1.5-flash, falling back to gemini-1.0-pro:', error2);
       
       // フォールバック: gemini-1.0-proを使用
       const fallbackModel = genAI.getGenerativeModel({

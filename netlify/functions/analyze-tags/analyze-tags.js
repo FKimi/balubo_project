@@ -284,7 +284,7 @@ ${userWorksData.map(work => `タイトル: ${work.title}\n説明: ${work.descrip
     // Gemini APIを呼び出して分析
     console.log('Gemini APIを呼び出して分析中...');
     const geminiResponse = await fetch(
-      'https://generativelanguage.googleapis.com/v1/models/gemini-pro-2:generateContent?key=' + geminiApiKey,
+      'https://generativelanguage.googleapis.com/v1/models/gemini-1.5-flash:generateContent?key=' + geminiApiKey,
       {
         method: 'POST',
         headers: {
@@ -312,7 +312,7 @@ ${userWorksData.map(work => `タイトル: ${work.title}\n説明: ${work.descrip
       const errorText = await geminiResponse.text();
       console.error('Gemini APIの呼び出しに失敗:', errorText);
       console.error('Gemini APIステータス:', geminiResponse.status, geminiResponse.statusText);
-      console.error('Gemini API URL:', 'https://generativelanguage.googleapis.com/v1/models/gemini-pro-2:generateContent');
+      console.error('Gemini API URL:', 'https://generativelanguage.googleapis.com/v1/models/gemini-1.5-flash:generateContent');
       console.error('Gemini APIキーの長さ:', geminiApiKey ? geminiApiKey.length : 0);
       
       return {
