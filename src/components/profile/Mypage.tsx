@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useCallback, useRef } from 'react';
-import { useNavigate, useParams } from 'react-router-dom';
+import { useNavigate, useParams, Link } from 'react-router-dom';
 import { supabase } from '../../lib/supabase';
 import { useToast } from '../../lib/hooks/useToast';
 import { 
@@ -15,7 +15,19 @@ import {
   LogOut,
   FileType,
   Image,
-  Lightbulb
+  Lightbulb,
+  PlusIcon,
+  ShareIcon,
+  ArrowLeftIcon,
+  ArrowRightIcon,
+  MessageCircleIcon,
+  EyeIcon,
+  MoreHorizontalIcon,
+  CameraIcon,
+  LockClosedIcon,
+  ThumbsUpIcon,
+  ThumbsDownIcon,
+  InfoIcon
 } from 'lucide-react';
 import { 
   AreaChart, 
@@ -27,56 +39,17 @@ import {
   ResponsiveContainer 
 } from 'recharts';
 import { analyzeUserTagsApi } from '../../api/tag-analysis-api';
-import { getUserInsightsApi } from '../../api/user-insights';
+import { getUserInsightsApi, UserInsightsResult } from '../../api/tag-analysis-api';
 import { analyzeUserTagsDirectly } from '../../lib/tag-analysis';
 // 型定義をインポート
 import { UserProfile, Work, Career, AIAnalysisResult } from '../../types';
-
-// ユーザープロファイルの型定義
-// interface UserProfile {
-//   id: string;
-//   name: string; 
-//   about: string;
-//   avatar_url: string; 
-//   website_url: string;
-//   created_at: string;
-//   background_image_url?: string;
-//   twitter_username?: string;
-//   instagram_username?: string;
-//   facebook_username?: string;
-//   headline?: string; 
-//   location?: string; 
-//   industry?: string; 
-// }
-
-// 作品データの型定義
-// interface Work {
-//   id: string;
-//   title: string;
-//   description?: string;
-//   image_url?: string;
-//   thumbnail_url?: string;
-//   created_at: string;
-//   updated_at?: string;
-//   user_id: string;
-//   views?: number;
-//   comment_count?: number;
-//   tags?: string[];
-// }
-
-// キャリア情報の型定義
-// interface Career {
-//   id: string;
-//   user_id: string;
-//   company: string;
-//   position: string;
-//   department?: string;
-//   start_date: string;
-//   end_date?: string;
-//   is_current_position: boolean;
-//   created_at: string;
-//   updated_at?: string;
-// }
+import { Button } from "@/components/ui/button";
+import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
+import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
+import { toast } from "@/components/ui/use-toast";
+import { getUserInsightsApi } from "@/api/tag-analysis-api";
+import { UserInsightsResult } from "@/api/tag-analysis-api";
+import { Loader2 as Spinner } from "lucide-react";
 
 const MONTHS = [
   '1月', '2月', '3月', '4月', '5月', '6月',
@@ -623,16 +596,35 @@ const Mypage: React.FC = () => {
       console.log('タグの出現頻度:', tagFrequency);
       console.log('タグの総数:', totalTags);
       
+      // サービスロールキーの存在を確認（デバッグ用）
+      const hasServiceKey = 
+        (typeof import.meta !== 'undefined' && 
+         import.meta.env && 
+         import.meta.env.VITE_SUPABASE_SERVICE_ROLE_KEY) ||
+        (typeof process !== 'undefined' && 
+         process.env && 
+         process.env.SUPABASE_SERVICE_ROLE_KEY);
+      
+      console.log('サービスロールキーの存在:', !!hasServiceKey);
+      
+      // 常にAPIを使用する（改良版APIはサービスロールキーがなくても動作する）
+      console.log('analyzeUserTagsApi関数を実行します（ユーザーID:', userProfile.id, '）');
       let result;
       
-      // 開発環境では直接タグ分析を行う
-      if (import.meta.env.DEV) {
-        console.log('開発環境で直接タグ分析を実行します');
-        result = await analyzeUserTagsDirectly(tagFrequency);
-      } else {
-        // 本番環境ではAPIを使用
-        console.log('本番環境でAPIを使用してタグ分析を実行します');
+      try {
+        // API関数を使用
         result = await analyzeUserTagsApi(userProfile.id);
+        console.log('API関数の実行結果:', result);
+      } catch (apiError) {
+        console.error('API実行中に例外が発生:', apiError);
+        // エラー処理
+        toast({
+          title: 'API実行エラー',
+          description: apiError instanceof Error ? apiError.message : '不明なエラーが発生しました',
+          variant: 'destructive'
+        });
+        setIsAnalyzing(false);
+        return;
       }
       
       if (!result.success || !result.data) {
@@ -698,9 +690,30 @@ const Mypage: React.FC = () => {
   const runAIAnalysis = useCallback(() => {
     if (isAnalyzing) return;
     
+    // 環境変数のデバッグ情報を出力
+    console.log('===== AI分析環境情報 =====');
+    console.log('環境モード:', import.meta.env.MODE);
+    console.log('VITE_SUPABASE_URL存在:', !!import.meta.env.VITE_SUPABASE_URL);
+    console.log('VITE_SUPABASE_ANON_KEY存在:', !!import.meta.env.VITE_SUPABASE_ANON_KEY);
+    console.log('VITE_SUPABASE_SERVICE_ROLE_KEY存在:', !!import.meta.env.VITE_SUPABASE_SERVICE_ROLE_KEY);
+    
+    if (import.meta.env.VITE_SUPABASE_URL) {
+      console.log('VITE_SUPABASE_URL値:', import.meta.env.VITE_SUPABASE_URL.substring(0, 10) + '...(省略)');
+    }
+    
+    if (userProfile) {
+      console.log('ユーザープロフィールID:', userProfile.id);
+      console.log('ユーザー名:', userProfile.full_name || userProfile.name);
+    } else {
+      console.log('ユーザープロフィール: 未取得');
+    }
+    
+    console.log('作品数:', works.length);
+    console.log('========================');
+    
     // 分析実行
     analyzeUserTagsLocal();
-  }, [isAnalyzing, analyzeUserTagsLocal]);
+  }, [isAnalyzing, analyzeUserTagsLocal, userProfile, works.length]);
 
   // キャリア編集ダイアログを開く関数
   const openCareerEditDialog = useCallback((career?: Career) => {
@@ -1049,6 +1062,102 @@ const Mypage: React.FC = () => {
     setShowAddWorkMenu(false);
   };
 
+  // タグの頻度データから直接分析を行う関数
+  const analyzeUserTagsDirectly = async (tagFrequency: Record<string, number>): Promise<UserInsightsResult> => {
+    console.log('タグ頻度データを使用して直接分析を実行:', tagFrequency);
+    
+    try {
+      // タグの出現回数でソート
+      const sortedTags = Object.entries(tagFrequency)
+        .sort(([, countA], [, countB]) => countB - countA);
+      
+      // 上位のタグを抽出
+      const topTags = sortedTags.slice(0, 5).map(([tag]) => tag);
+      const allTags = sortedTags.map(([tag]) => tag);
+      
+      // 分野を推測する簡易ロジック
+      const determineAreas = (tags: string[]): string[] => {
+        const areaMap: Record<string, string[]> = {
+          'デザイン': ['デザイン', 'UI', 'UX', 'グラフィック', 'ビジュアル', 'レイアウト'],
+          'プログラミング': ['プログラミング', 'コーディング', '開発', 'システム', 'アプリ'],
+          'ライティング': ['ライティング', '文章', '記事', 'コンテンツ', 'ブログ'],
+          'マーケティング': ['マーケティング', '広告', 'PR', 'SEO', '販促'],
+          'イラスト': ['イラスト', '絵', 'アート', '描画', 'キャラクター'],
+          '写真': ['写真', 'カメラ', '撮影', 'フォト'],
+          'ビデオ': ['ビデオ', '動画', '映像', '編集', 'モーション']
+        };
+        
+        // タグに基づいて分野をカウント
+        const areaCounts: Record<string, number> = {};
+        
+        tags.forEach(tag => {
+          Object.entries(areaMap).forEach(([area, keywords]) => {
+            if (keywords.some(keyword => tag.includes(keyword))) {
+              areaCounts[area] = (areaCounts[area] || 0) + 1;
+            }
+          });
+        });
+        
+        // 出現回数でソート
+        return Object.entries(areaCounts)
+          .sort(([, countA], [, countB]) => countB - countA)
+          .slice(0, 3)
+          .map(([area]) => area);
+      };
+      
+      // 作品内の総タグ数
+      const totalTags = Object.values(tagFrequency).reduce((sum, count) => sum + count, 0);
+      
+      // タグの多様性を計算
+      const uniqueTagsCount = Object.keys(tagFrequency).length;
+      const tagDiversity = Math.min(1, uniqueTagsCount / 10); // 10種類以上で最大
+      
+      // 推定される専門性、オリジナリティ、クオリティを計算
+      const expertiseLevel = Math.min(0.9, 0.3 + (totalTags / 30) * 0.3 + tagDiversity * 0.3);
+      const originalityLevel = Math.min(0.9, 0.4 + tagDiversity * 0.5);
+      const qualityLevel = Math.min(0.9, 0.4 + (totalTags / 20) * 0.5);
+      
+      // 興味分野を特定
+      const interestAreas = determineAreas(allTags);
+      
+      // 分析結果を生成
+      return {
+        success: true,
+        data: {
+          originality: {
+            summary: `独自の視点と表現スタイルを持っています。特に${topTags[0] || 'クリエイティブ表現'}と${topTags[1] || 'コンテンツ制作'}において、独自のアプローチで作品を生み出しています。`
+          },
+          quality: {
+            summary: `専門性とスキルが高く、信頼性のあるコンテンツを作成できます。特に${topTags[0] || 'クリエイティブ分野'}において、高い完成度の作品を提供しています。`
+          },
+          expertise: {
+            summary: `${interestAreas[0] || 'クリエイティブ'}と${interestAreas[1] || 'コンテンツ制作'}を中心に幅広い専門知識を持ち、実践的なスキルを活かした作品作りが特徴です。`
+          },
+          engagement: {
+            summary: `読者や視聴者との共感を生み出す表現力があり、特に${topTags[0] || 'コンテンツ'}を通じて強い繋がりを構築できます。`
+          },
+          overall_insight: {
+            summary: `様々な要素が組み合わさり、クリエイターとしての独自の強みを形成しています。特に${interestAreas[0] || 'クリエイティブ分野'}における専門性と、${topTags[0] || 'オリジナル'}コンテンツ制作の能力が際立っています。`,
+            future_potential: `今後さらに${interestAreas[1] || '新しい分野'}や${interestAreas[2] || 'テクノロジー'}との融合を進めることで、より幅広い表現の可能性を広げていくことができるでしょう。`
+          },
+          specialties: topTags.length > 0 ? topTags : ['クリエイティブ制作', 'コンテンツ開発', 'デザイン'],
+          interests: {
+            areas: interestAreas.length > 0 ? interestAreas : ['クリエイティブ', 'デジタルメディア', 'コンテンツ'],
+            topics: allTags.slice(5, 8)
+          },
+          design_styles: ['モダン', 'クリーン', 'ミニマリスト'],
+          tag_frequency: tagFrequency
+        }
+      };
+    } catch (error) {
+      console.error('直接分析中にエラーが発生:', error);
+      return {
+        success: false,
+        error: '分析処理中にエラーが発生しました。'
+      };
+    }
+  };
+
   return (
     <div className="min-h-screen bg-gray-50">
       {/* ローディング表示 */}
@@ -1342,7 +1451,7 @@ const Mypage: React.FC = () => {
           {isAnalyzing ? (
             <div className="text-center py-8">
               <div className="flex flex-col items-center">
-                <Loader2 className="h-12 w-12 animate-spin text-blue-500" />
+                <Spinner className="h-12 w-12 animate-spin text-blue-500" />
                 <h3 className="mt-2 text-lg font-medium text-gray-900">分析中...</h3>
                 <p className="text-sm text-gray-500">
                   あなたの作品とタグを分析しています。少々お待ちください。
