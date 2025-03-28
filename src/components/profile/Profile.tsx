@@ -1,6 +1,6 @@
 import { useState, useEffect, useCallback } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
-import { fetchProfileWithAdmin, fetchWorksWithAdmin, fetchCareersWithAdmin, fetchAIAnalysisWithAdmin } from '../../lib/supabase-admin';
+import { supabase } from '../../lib/supabase';
 import { 
   Loader2, 
   AlertCircle, 
@@ -139,41 +139,60 @@ export function Profile() {
           return;
         }
 
+        // 管理者権限ではなく、通常のsupabaseクライアントでデータを取得するように変更
+        console.log('プロフィール情報を取得中 (clientモード):', id);
+        
         // プロフィール情報を取得
-        const { data: profileData, error: profileError } = await fetchProfileWithAdmin(String(id));
+        const { data: profileData, error: profileError } = await supabase
+          .from('profiles')
+          .select('*')
+          .eq('id', String(id))
+          .single();
         
         if (profileError) {
-          console.error('管理者権限でのプロフィール取得エラー:', profileError);
+          console.error('プロフィール取得エラー:', profileError);
           setError('プロフィールの取得に失敗しました');
           setLoading(false);
           return;
         }
         
-        // 管理者権限で作品データを取得
-        const { data: worksData, error: worksError } = await fetchWorksWithAdmin(String(id));
+        // 作品データを取得
+        const { data: worksData, error: worksError } = await supabase
+          .from('works')
+          .select('*')
+          .eq('user_id', String(id))
+          .order('created_at', { ascending: false });
         
         if (worksError) {
-          console.error('管理者権限での作品取得エラー:', worksError);
+          console.error('作品取得エラー:', worksError);
           setError('作品の取得に失敗しました');
           setLoading(false);
           return;
         }
         
-        // 管理者権限で職歴データを取得
-        const { data: careersData, error: careersError } = await fetchCareersWithAdmin(String(id));
+        // 職歴データを取得
+        const { data: careersData, error: careersError } = await supabase
+          .from('careers')
+          .select('*')
+          .eq('user_id', String(id))
+          .order('start_date', { ascending: false });
         
         if (careersError) {
-          console.error('管理者権限での職歴取得エラー:', careersError);
+          console.error('職歴取得エラー:', careersError);
           setError('職歴の取得に失敗しました');
           setLoading(false);
           return;
         }
         
-        // 管理者権限でAI分析データを取得
-        const { data: aiData, error: aiError } = await fetchAIAnalysisWithAdmin(String(id));
+        // AI分析データを取得
+        const { data: aiData, error: aiError } = await supabase
+          .from('user_insights')
+          .select('*')
+          .eq('user_id', String(id))
+          .single();
         
         if (aiError) {
-          console.error('管理者権限でのAI分析取得エラー:', aiError);
+          console.error('AI分析取得エラー:', aiError);
           // AI分析エラーは致命的ではないので、処理を続行
         } else if (aiData) {
           setAiAnalysis(aiData);
