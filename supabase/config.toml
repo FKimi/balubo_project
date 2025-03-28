@@ -1,0 +1,7 @@
+# Supabase設定ファイル
+# 詳細: https://supabase.com/docs/guides/functions/local-development
+
+[functions]
+# 関数の設定
+[functions.proxy-image]
+verify_jwt = false

@@ -36,30 +36,45 @@
     <div id="root"></div>
     <div id="error-container"></div>
     <script>
+      // 環境に応じたエラー処理
+      const isProd = window.location.hostname !== 'localhost' && 
+                     !window.location.hostname.includes('127.0.0.1') && 
+                     !window.location.hostname.includes('192.168.');
+      
       // エラーをキャプチャして表示するための処理
       window.addEventListener('error', function(event) {
-        const errorContainer = document.getElementById('error-container');
-        errorContainer.style.display = 'block';
-        const errorDetails = document.createElement('div');
-        errorDetails.innerHTML = `<strong>エラー:</strong> ${event.error?.message || event.message}<br>
-        <strong>場所:</strong> ${event.filename}:${event.lineno}:${event.colno}<br>
-        <strong>スタック:</strong> ${event.error?.stack || 'スタック情報なし'}<br>
-        ---`;
-        errorContainer.appendChild(errorDetails);
+        // 本番環境ではコンソールにのみ記録
         console.error(event.error || event.message);
+        
+        // 開発環境でのみ詳細表示
+        if (!isProd) {
+          const errorContainer = document.getElementById('error-container');
+          errorContainer.style.display = 'block';
+          const errorDetails = document.createElement('div');
+          errorDetails.innerHTML = `<strong>エラー:</strong> ${event.error?.message || event.message}<br>
+          <strong>場所:</strong> ${event.filename}:${event.lineno}:${event.colno}<br>
+          <strong>スタック:</strong> ${event.error?.stack || 'スタック情報なし'}<br>
+          ---`;
+          errorContainer.appendChild(errorDetails);
+        }
       });
 
       // すべてのコンソールエラーをキャプチャ
       const originalConsoleError = console.error;
       console.error = function() {
-        const errorContainer = document.getElementById('error-container');
-        errorContainer.style.display = 'block';
-        const errorMsg = Array.from(arguments).map(arg => 
-          typeof arg === 'object' ? JSON.stringify(arg, null, 2) : String(arg)
-        ).join(' ');
-        const errorDetails = document.createElement('div');
-        errorDetails.innerHTML = `<strong>コンソールエラー:</strong> ${errorMsg}<br>---`;
-        errorContainer.appendChild(errorDetails);
+        // 本番環境ではUIに表示しない
+        if (!isProd) {
+          const errorContainer = document.getElementById('error-container');
+          errorContainer.style.display = 'block';
+          const errorMsg = Array.from(arguments).map(arg => 
+            typeof arg === 'object' ? JSON.stringify(arg, null, 2) : String(arg)
+          ).join(' ');
+          const errorDetails = document.createElement('div');
+          errorDetails.innerHTML = `<strong>コンソールエラー:</strong> ${errorMsg}<br>---`;
+          errorContainer.appendChild(errorDetails);
+        }
+        
+        // 常にコンソールには出力
         originalConsoleError.apply(console, arguments);
       };
     </script>

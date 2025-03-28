@@ -452,38 +452,26 @@ function LandingPage() {
 function App() {
   // デバッグ用の一時的な表示
   const isDebugMode = false;
-  const [supabaseStatus, setSupabaseStatus] = useState<{
-    supabase: 'untested' | 'success' | 'failed';
-    supabaseAdmin: 'untested' | 'success' | 'failed';
-    error?: string;
-  }>({
-    supabase: 'untested',
-    supabaseAdmin: 'untested'
-  });
-
-  // アプリケーション初期化時のデバッグ情報を出力
-  useEffect(() => {
-    logEnvironmentInfo();
-    logSupabaseDetails();
-  }, []);
-
-  // Supabase接続テスト
-  useEffect(() => {
-    if (isDebugMode) {
-      // 環境変数の状態をチェック
-      const envStatus = {
-        VITE_SUPABASE_URL: import.meta.env.VITE_SUPABASE_URL ? '設定あり' : '未設定',
-        VITE_SUPABASE_ANON_KEY: import.meta.env.VITE_SUPABASE_ANON_KEY ? '設定あり' : '未設定',
-        VITE_SUPABASE_SERVICE_ROLE_KEY: import.meta.env.VITE_SUPABASE_SERVICE_ROLE_KEY ? '設定あり' : '未設定',
-        VITE_GEMINI_API_KEY: import.meta.env.VITE_GEMINI_API_KEY ? '設定あり' : '未設定',
-      };
-      
-      console.log('[環境変数状態]', envStatus);
-      
+  
+  if (isDebugMode) {
+    // eslint-disable-next-line react-hooks/rules-of-hooks
+    const [supabaseStatus, setSupabaseStatus] = useState<{
+      supabase: 'untested' | 'success' | 'failed';
+      supabaseAdmin: 'untested' | 'success' | 'failed';
+      error?: string;
+    }>({
+      supabase: 'untested',
+      supabaseAdmin: 'untested'
+    });
+    
+    // デバッグモードの場合のみ実行される関数
+    const testSupabaseConnections = () => {
       // 通常のSupabaseクライアントのテスト
       async function testNormalSupabase() {
         try {
-          const { error } = await supabase.from('profiles').select('count()', { count: 'exact', head: true });
+          // eslint-disable-next-line @typescript-eslint/no-unused-vars
+          const { data: _, error } = await supabase.from('profiles').select('id').limit(1);
+          
           if (error) {
             setSupabaseStatus(prev => ({ ...prev, supabase: 'failed', error: error.message }));
             console.error('[ERROR] 通常Supabase接続エラー:', { message: error.message });
@@ -502,50 +490,73 @@ function App() {
         try {
           // 少しの遅延を入れて、テストをシーケンシャルに実行
           await new Promise(resolve => setTimeout(resolve, 500));
-          const { error } = await supabaseAdmin.from('profiles').select('count()', { count: 'exact', head: true });
+          // eslint-disable-next-line @typescript-eslint/no-unused-vars
+          const { data: _, error } = await supabaseAdmin.from('profiles').select('id').limit(1);
+          
           if (error) {
             setSupabaseStatus(prev => ({ ...prev, supabaseAdmin: 'failed', error: error.message }));
-            console.error('[ERROR] 管理者Supabase接続エラー:', { message: error.message });
+            console.error('[ERROR] Supabase Admin接続エラー:', { message: error.message });
           } else {
             setSupabaseStatus(prev => ({ ...prev, supabaseAdmin: 'success' }));
-            console.log('[SUCCESS] 管理者Supabase接続成功');
+            console.log('[SUCCESS] Supabase Admin接続成功');
           }
         } catch (error) {
           setSupabaseStatus(prev => ({ ...prev, supabaseAdmin: 'failed', error: String(error) }));
-          console.error('[ERROR] 管理者Supabase接続例外:', { message: error instanceof Error ? error.message : String(error) });
+          console.error('[ERROR] Supabase Admin接続例外:', { message: error instanceof Error ? error.message : String(error) });
         }
-      };
-
+      }
+      
+      // テストの実行
       testNormalSupabase();
       testSupabaseAdmin();
-    }
-  }, [isDebugMode]);
-
-  if (isDebugMode) {
-    return (
-      <div style={{ padding: '20px' }}>
-        <h1 style={{ color: '#3182ce', marginBottom: '20px' }}>Balubo - デバッグモード</h1>
-        <div style={{ marginTop: '20px' }}>
-          <button 
-            onClick={() => {
-              localStorage.setItem('debugMode', 'false');
-              window.location.reload();
-            }}
-            style={{
-              padding: '8px 16px',
-              backgroundColor: '#3182ce',
-              color: 'white',
-              border: 'none',
-              borderRadius: '4px',
-              cursor: 'pointer'
-            }}
-          >
-            通常モードで再読み込み
-          </button>
+    };
+    
+    // デバッグモードの場合のみテストを実行
+    useEffect(() => {
+      if (isDebugMode) {
+        testSupabaseConnections();
+      }
+    }, [isDebugMode]);
+    
+    if (isDebugMode) {
+      return (
+        <div style={{ padding: '20px' }}>
+          <h1 style={{ color: '#3182ce', marginBottom: '20px' }}>Balubo - デバッグモード</h1>
+          <div style={{ marginTop: '20px' }}>
+            <button 
+              onClick={() => {
+                localStorage.setItem('debugMode', 'false');
+                window.location.reload();
+              }}
+              style={{
+                padding: '8px 16px',
+                backgroundColor: '#3182ce',
+                color: 'white',
+                border: 'none',
+                borderRadius: '4px',
+                cursor: 'pointer'
+              }}
+            >
+              通常モードで再読み込み
+            </button>
+          </div>
+          {supabaseStatus && (
+            <div>
+              <p>Supabase Status: {supabaseStatus.supabase}</p>
+              <p>Supabase Admin Status: {supabaseStatus.supabaseAdmin}</p>
+              {supabaseStatus.error && <p>Error: {supabaseStatus.error}</p>}
+            </div>
+          )}
         </div>
-      </div>
-    );
+      );
+    }
   }
+
+  // アプリケーション初期化時のデバッグ情報を出力
+  useEffect(() => {
+    logEnvironmentInfo();
+    logSupabaseDetails();
+  }, []);
 
   // 通常の App コンポーネントの内容
   return (

@@ -14,7 +14,7 @@ export interface Work {
 }
 
 // AI分析結果の型定義
-export interface AIAnalysisResult {
+export interface LegacyAIAnalysisResult {
   expertise: {
     summary: string;
     topSkills: string[];
@@ -40,7 +40,7 @@ export interface AIAnalysisResult {
  * @param works ユーザーの作品一覧
  * @returns 分析結果
  */
-export async function analyzeUserData(works: Work[]): Promise<AIAnalysisResult> {
+export async function analyzeUserData(works: Work[]): Promise<LegacyAIAnalysisResult> {
   try {
     // 全作品からタグを抽出
     const allTags: string[] = [];
@@ -111,7 +111,7 @@ export async function analyzeUserData(works: Work[]): Promise<AIAnalysisResult> 
 }
 
 // 専門性を分析する関数
-function analyzeExpertise(works: Work[], tags: string[], categoryCounts: Record<string, number>): AIAnalysisResult['expertise'] {
+function analyzeExpertise(works: Work[], tags: string[], categoryCounts: Record<string, number>): LegacyAIAnalysisResult['expertise'] {
   // タグを専門カテゴリに分類
   const expertiseCategories = categorizeTagsByExpertise(tags);
   
@@ -148,7 +148,7 @@ function analyzeExpertise(works: Work[], tags: string[], categoryCounts: Record<
 }
 
 // 興味・関心を分析する関数
-function analyzeInterests(works: Work[], tags: string[], categoryCounts: Record<string, number>): AIAnalysisResult['interests'] {
+function analyzeInterests(works: Work[], tags: string[], categoryCounts: Record<string, number>): LegacyAIAnalysisResult['interests'] {
   // タグを興味カテゴリに分類
   const interestCategories = categorizeTagsByInterest(tags);
   
@@ -294,7 +294,7 @@ function categorizeTagsByInterest(tags: string[]): string[] {
 }
 
 // 独自性を分析する関数
-function analyzeUniqueness(works: Work[], tags: string[]): AIAnalysisResult['uniqueness'] {
+function analyzeUniqueness(works: Work[], tags: string[]): LegacyAIAnalysisResult['uniqueness'] {
   // タグと作品内容から独自性を特定
   const uniqueTraits = identifyUniqueTraits(works, tags);
   
@@ -368,7 +368,7 @@ function identifyUniqueTraits(works: Work[], tags: string[]): string[] {
 }
 
 // 才能の要約を生成する関数
-function generateTalentSummary(expertise: AIAnalysisResult['expertise']): string {
+function generateTalentSummary(expertise: LegacyAIAnalysisResult['expertise']): string {
   // 作品数に基づいて経験レベルを判断
   const experienceLevel = expertise.level > 5 ? "豊富な" : expertise.level > 3 ? "一定の" : "基本的な";
   

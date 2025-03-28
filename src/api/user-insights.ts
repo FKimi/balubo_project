@@ -21,10 +21,14 @@ export async function saveUserInsights(
   insights: {
     originality?: InsightItem;
     quality?: InsightItem;
+    expertise?: InsightItem;
     engagement?: InsightItem;
-    content_style?: InsightItem;
     specialties?: string[];
     design_styles?: string[];
+    overall_insight?: {
+      summary: string;
+      future_potential?: string;
+    };
   }
 ): Promise<{ success: boolean; error?: string }> {
   try {
@@ -42,17 +46,20 @@ export async function saveUserInsights(
     
     let error;
     
+    // データベーススキーマに合わせてフィールドをマッピング
+    const expertiseData = insights.expertise || null;
+    const engagementData = insights.engagement || null;
+    
     if (existingRecord) {
       // 既存レコードがある場合は更新（サービスロールを使用）
       const { error: updateError } = await supabaseAdmin
         .from('user_insights')
         .update({
-          originality: insights.originality || null,
-          quality: insights.quality || null,
-          engagement: insights.engagement || null,
-          content_style: insights.content_style || null,
+          expertise: expertiseData,
+          engagement: engagementData,
           specialties: insights.specialties || [],
           design_styles: insights.design_styles || [],
+          overall_insight: insights.overall_insight || null,
           updated_at: new Date().toISOString()
         })
         .eq('id', existingRecord.id);
@@ -64,12 +71,11 @@ export async function saveUserInsights(
         .from('user_insights')
         .insert({
           user_id: userId,
-          originality: insights.originality || null,
-          quality: insights.quality || null,
-          engagement: insights.engagement || null,
-          content_style: insights.content_style || null,
+          expertise: expertiseData,
+          engagement: engagementData,
           specialties: insights.specialties || [],
           design_styles: insights.design_styles || [],
+          overall_insight: insights.overall_insight || null,
           created_at: new Date().toISOString(),
           updated_at: new Date().toISOString()
         });
@@ -99,10 +105,20 @@ export async function getUserInsightsApi(
 ): Promise<{ 
   success: boolean; 
   data?: { 
-    originality: string[]; 
-    quality: string[]; 
-    engagement: string[]; 
-    content_style: string[]; 
+    originality?: InsightItem; 
+    quality?: InsightItem; 
+    expertise?: InsightItem;
+    engagement?: InsightItem;
+    overall_insight?: {
+      summary: string;
+      future_potential?: string;
+    };
+    specialties?: string[];
+    design_styles?: string[];
+    clusters?: Array<{
+      name: string;
+      tags: string[];
+    }>;
   }; 
   error?: string 
 }> {
@@ -135,10 +151,17 @@ export async function getUserInsightsApi(
     return { 
       success: true, 
       data: {
-        originality: data.originality?.topics || [],
-        quality: data.quality?.topics || [],
-        engagement: data.engagement?.topics || [],
-        content_style: data.content_style?.topics || []
+        originality: data.originality || { summary: '' },
+        quality: data.quality || { summary: '' },
+        expertise: data.expertise || { summary: '' },
+        engagement: data.engagement || { summary: '' },
+        overall_insight: data.overall_insight || {
+          summary: 'これらの要素は相互に関連し合い、クリエイターとしての総合的な価値を形成しています。一つの要素が他の要素を強化し、全体として独自の魅力を生み出しています。あなたの作品は、専門性と創造性のバランスが取れており、読者に新たな視点や価値を提供しています。',
+          future_potential: 'あなたの創造性と情熱は、今後さらに多くの可能性を広げていくでしょう。新たな挑戦や異なる分野との融合を通じて、クリエイターとしての価値をさらに高めていくことができます。自分の強みを活かしながら、好奇心を持って探求を続けることが、長期的な成長につながります。'
+        },
+        specialties: data.specialties || [],
+        design_styles: data.design_styles || [],
+        clusters: data.clusters || []
       }
     };
   } catch (error) {

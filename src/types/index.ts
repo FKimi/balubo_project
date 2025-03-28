@@ -72,27 +72,22 @@ export interface Career {
 
 // AI分析結果関連
 export interface AIAnalysisResult {
-  expertise?: {
+  originality: { summary: string };
+  quality: { summary: string };
+  expertise: { summary: string };
+  engagement: { summary: string };
+  // uniquenessフィールドはengagementに置き換え
+  overall_insight: {
     summary: string;
-  };
-  talent?: {
-    summary: string;
-  };
-  uniqueness?: {
-    summary: string;
-  };
-  content_style?: {
-    summary: string;
+    future_potential?: string;
   };
   specialties?: string[];
+  design_styles?: string[];
   interests?: {
     areas?: string[];
     topics?: string[];
-    summary?: string;
   };
-  design_styles?: string[];
-  tag_frequency?: { [key: string]: number };
-  clusters?: Array<{ name: string; tags: string[] }>;
+  tag_frequency?: Record<string, number>;
 }
 
 // 表示用AI分析結果（互換性のために残す）

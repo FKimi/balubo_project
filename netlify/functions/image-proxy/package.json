@@ -1,0 +1,9 @@
+{
+  "name": "image-proxy",
+  "version": "1.0.0",
+  "description": "画像プロキシ関数 - CORSの制限を回避するために外部画像をプロキシとして取得",
+  "main": "image-proxy.js",
+  "dependencies": {
+    "node-fetch": "^2.6.7"
+  }
+}

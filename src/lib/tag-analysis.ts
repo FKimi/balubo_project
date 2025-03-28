@@ -634,6 +634,187 @@ async function fallbackSaveTagAnalytics(userId: string, tagAnalysis: TagAnalysis
 }
 
 /**
+ * ユーザーの作品タグから直接分析を行う関数（開発環境用）
+ * @param tagFrequency タグの出現頻度マップ
+ * @returns ユーザーインサイト分析結果
+ */
+export async function analyzeUserTagsDirectly(tagFrequency: Record<string, number>): Promise<{
+  success: boolean;
+  data?: {
+    originality: { summary: string };
+    quality: { summary: string };
+    expertise: { summary: string };
+    engagement: { summary: string };
+    specialties: string[];
+    interests: {
+      areas: string[];
+      topics: string[];
+    };
+    design_styles: string[];
+    tag_frequency: Record<string, number>;
+    overall_insight: {
+      summary: string;
+      future_potential: string;
+    };
+    clusters: Array<{
+      name: string;
+      tags: string[];
+    }>;
+  };
+  error?: string;
+}> {
+  try {
+    // APIキーがない場合はフォールバック分析を返す
+    if (!GEMINI_API_KEY) {
+      console.warn('No Gemini API key provided, returning fallback analysis');
+      return {
+        success: true,
+        data: {
+          originality: { summary: "独自の視点と表現スタイルを持っています。タグから分析された特徴です。" },
+          quality: { summary: "専門性とスキルが高く、信頼性のあるコンテンツを作成できます。タグから分析された特徴です。" },
+          expertise: { summary: "専門知識と技術的な能力が高く、作品に反映されています。タグから分析された特徴です。" },
+          engagement: { summary: "独自のアイデアと表現方法を持っており、作品に新しい価値を与えています。タグから分析された特徴です。" },
+          specialties: Object.keys(tagFrequency).slice(0, 5),
+          interests: {
+            areas: Object.keys(tagFrequency).slice(0, 3),
+            topics: Object.keys(tagFrequency).slice(3, 6)
+          },
+          design_styles: ["ミニマリスト", "モダン", "クリーン"],
+          tag_frequency: tagFrequency,
+          overall_insight: {
+            summary: "これらの要素は相互に関連し合い、クリエイターとしての総合的な価値を形成しています。一つの要素が他の要素を強化し、全体として独自の魅力を生み出しています。あなたの作品は、専門性と創造性のバランスが取れており、読者に新たな視点や価値を提供しています。",
+            future_potential: "あなたの創造性と情熱は、今後さらに多くの可能性を広げていくでしょう。新たな挑戦や異なる分野との融合を通じて、クリエイターとしての価値をさらに高めていくことができます。自分の強みを活かしながら、好奇心を持って探求を続けることが、長期的な成長につながります。"
+          },
+          clusters: []
+        }
+      };
+    }
+
+    console.log("タグ頻度データからユーザー分析を開始します...");
+    
+    // タグを頻度順にソート
+    const sortedTags = Object.entries(tagFrequency)
+      .sort((a, b) => b[1] - a[1])
+      .map(([name]) => name);
+    
+    // タグの関連性を分析
+    const tagsWithRelevance = await analyzeTagRelevance(sortedTags);
+    
+    // タグをクラスタリング
+    const clusters = await clusterTags(tagsWithRelevance);
+    
+    // Gemini APIを使用してタグデータから分析結果を生成
+    const genAI = new GoogleGenerativeAI(GEMINI_API_KEY);
+    const model = genAI.getGenerativeModel({
+      model: "gemini-1.5-flash",
+      generationConfig: {
+        temperature: 0.7,
+        topP: 0.9,
+        topK: 40,
+        maxOutputTokens: 4096,
+      },
+    });
+
+    // 分析用のプロンプト
+    const prompt = `
+      あなたはクリエイターの作品分析の専門家です。
+      以下のタグデータを基にクリエイターの特徴を深く分析してください。
+      
+      タグ頻度データ:
+      ${JSON.stringify(tagFrequency)}
+      
+      クラスター分析結果:
+      ${JSON.stringify(clusters)}
+      
+      以下の4つの観点から詳細な分析結果を生成してください：
+      
+      1. 創造性と独自性（オリジナリティ）: クリエイターの独自の視点や表現スタイル、創作アプローチの特徴、他のクリエイターとの差別化ポイント、革新性など
+      2. 専門性とスキル（クオリティ）: クリエイターの専門知識や技術的な能力、経験の深さ、作品の質を高める特徴的なアプローチ、技術的な強みなど
+      3. 専門知識と技術的能力（エキスパート）: クリエイターの作品に反映された専門知識や技術的能力、作品の複雑さや深み、技術的な挑戦など
+      4. 独自性と新規性（エンゲージメント）: クリエイターの作品に反映された独自のアイデアや表現方法、作品の新規性や斬新さ、他の作品との差別化ポイントなど
+      
+      また、以下の情報も抽出してください：
+      - 専門分野（最大5つ）
+      - 興味・関心のある分野（最大5つ）
+      - デザインスタイル（最大3つ）
+      
+      以下のJSON形式で回答してください：
+      
+      {
+        "originality": {
+          "summary": "創造性と独自性に関する詳細な分析（3-5文程度）。クリエイターの独自の視点、革新的なアプローチ、作品の特徴的な要素などを含む。"
+        },
+        "quality": {
+          "summary": "専門性とスキルに関する詳細な分析（3-5文程度）。技術的な強み、専門知識の深さ、作品の質を高める特徴的なアプローチなどを含む。"
+        },
+        "expertise": {
+          "summary": "専門知識と技術的能力に関する詳細な分析（3-5文程度）。作品に反映された専門知識や技術的能力、作品の複雑さや深み、技術的な挑戦などを含む。"
+        },
+        "engagement": {
+          "summary": "独自性と新規性に関する詳細な分析（3-5文程度）。作品に反映された独自のアイデアや表現方法、作品の新規性や斬新さ、他の作品との差別化ポイントなどを含む。"
+        },
+        "overall_insight": {
+          "summary": "総合的な考察（5-7文程度）。上記の要素を統合した全体的な分析、クリエイターの強みと特徴、今後の可能性や成長の方向性についての洞察を含む。",
+          "future_potential": "今後の可能性や成長の方向性についての具体的なアドバイス（3-4文程度）"
+        },
+        "specialties": ["専門分野1", "専門分野2", ...],
+        "interests": {
+          "areas": ["興味・関心のある分野1", "興味・関心のある分野2", ...],
+          "topics": ["トピック1", "トピック2", ...]
+        },
+        "design_styles": ["デザインスタイル1", "デザインスタイル2", ...]
+      }
+      
+      各分析は具体的で洞察に富み、クリエイターの知られざる魅力や新しい発見、価値を引き出すものにしてください。表面的な分析ではなく、タグデータから読み取れる深層的なパターンや特徴に基づいた分析を心がけてください。
+    `;
+    
+    console.log("Gemini APIにリクエストを送信します...");
+    
+    // APIリクエスト
+    const result = await model.generateContent(prompt);
+    const response = result.response;
+    const text = response.text();
+    
+    console.log("Gemini APIからレスポンスを受信しました");
+    
+    // JSON部分を抽出
+    const jsonMatch = text.match(/\{[\s\S]*\}/);
+    if (!jsonMatch) {
+      console.error('APIからの応答にJSON形式のデータが含まれていません:', text.substring(0, 200));
+      throw new Error('APIからの応答にJSON形式のデータが含まれていません');
+    }
+    
+    const jsonText = jsonMatch[0];
+    console.log('分析API応答からJSON抽出:', jsonText);
+    
+    try {
+      const analysisResult = JSON.parse(jsonText);
+      
+      return {
+        success: true,
+        data: {
+          ...analysisResult,
+          tag_frequency: tagFrequency,
+          clusters: clusters.map(cluster => ({
+            name: cluster.name,
+            tags: cluster.tags
+          }))
+        }
+      };
+    } catch (parseError) {
+      console.error('JSON解析エラー:', parseError);
+      throw new Error('APIレスポンスのJSON解析に失敗しました');
+    }
+  } catch (error) {
+    console.error('タグ分析エラー:', error);
+    return {
+      success: false,
+      error: error instanceof Error ? error.message : '不明なエラーが発生しました'
+    };
+  }
+}
+
+/**
  * フォールバックのタグ分析結果を返す関数
  * @returns フォールバックのタグ分析結果
  */
