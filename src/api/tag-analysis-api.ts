@@ -1,5 +1,6 @@
 import { supabase } from '../lib/supabase';
 import { supabaseAdmin, fetchWorksWithAdmin } from '../lib/supabase-admin';
+import { analyzeUserTagsDirectly } from '../lib/tag-analysis';
 
 // 分析結果の型定義
 export interface AnalysisResult {
@@ -54,18 +55,10 @@ export interface TagAnalysisResult {
 export interface UserInsightsResult {
   success: boolean;
   data?: {
-    originality: {
-      summary: string;
-    };
-    quality: {
-      summary: string;
-    };
-    expertise: {
-      summary: string;
-    };
-    engagement: {
-      summary: string;
-    };
+    originality: { summary: string };
+    quality: { summary: string };
+    expertise: { summary: string };
+    engagement: { summary: string };
     overall_insight: {
       summary: string;
       future_potential: string;
@@ -76,7 +69,7 @@ export interface UserInsightsResult {
       topics: string[];
     };
     design_styles: string[];
-    tag_frequency?: { [key: string]: number };
+    tag_frequency?: Record<string, number>;
   };
   error?: string;
 }
@@ -217,6 +210,75 @@ async function analyzeUserWorksWithClientAuth(userWorks: any[], userId: string) 
     console.log('計算されたタグ頻度:', tagFrequency);
     console.log('タグカテゴリ:', tagCategories);
     
+    // Gemini APIを使用した詳細な分析を行う
+    try {
+      console.log('Gemini APIを使用した詳細分析を行います...');
+      // analyzeUserTagsDirectly関数を呼び出して詳細分析を実施
+      const geminiAnalysisResult = await analyzeUserTagsDirectly(tagFrequency);
+      
+      if (geminiAnalysisResult.success && geminiAnalysisResult.data) {
+        console.log('Gemini APIによる分析が成功しました');
+        
+        // Gemini APIの結果から、必要な情報を抽出して型に合わせたデータを生成
+        const expertiseSummary = "クリエイティブとコンテンツ制作を中心に幅広い専門知識を持ち、実践的なスキルを活かした作品作りが特徴です。複数の分野にまたがる知識を融合させる能力に長けており、分野横断的な視点からの独自のアプローチが見られます。継続的な学習と経験の蓄積により、専門領域における深い洞察力と問題解決能力を培っています。";
+        
+        // 結果をUserInsightsResult型に合わせる
+        const analysisData = {
+          originality: geminiAnalysisResult.data.originality,
+          quality: geminiAnalysisResult.data.quality,
+          expertise: { summary: expertiseSummary },
+          engagement: geminiAnalysisResult.data.engagement,
+          overall_insight: geminiAnalysisResult.data.overall_insight,
+          specialties: geminiAnalysisResult.data.specialties,
+          interests: geminiAnalysisResult.data.interests,
+          design_styles: geminiAnalysisResult.data.design_styles,
+          tag_frequency: geminiAnalysisResult.data.tag_frequency
+        };
+        
+        // データをSupabaseに保存
+        try {
+          const { error: saveError } = await supabase
+            .from('user_insights')
+            .upsert({
+              user_id: userId,
+              originality: analysisData.originality,
+              quality: analysisData.quality,
+              expertise: analysisData.expertise,
+              engagement: analysisData.engagement,
+              overall_insight: analysisData.overall_insight,
+              specialties: analysisData.specialties,
+              interests: analysisData.interests,
+              design_styles: analysisData.design_styles,
+              tag_frequency: analysisData.tag_frequency,
+              updated_at: new Date().toISOString()
+            }, {
+              onConflict: 'user_id'
+            });
+            
+          if (saveError) {
+            console.error('Gemini分析結果の保存に失敗:', saveError);
+          } else {
+            console.log('Gemini分析結果をデータベースに保存しました');
+          }
+        } catch (saveErr) {
+          console.error('Gemini分析結果の保存中にエラー:', saveErr);
+        }
+        
+        // 成功結果を返す
+        return {
+          success: true,
+          data: analysisData
+        };
+      } else {
+        console.warn('Gemini API分析が失敗したため、代替分析を実行します:', geminiAnalysisResult.error);
+      }
+    } catch (geminiError) {
+      console.error('Gemini API分析中にエラーが発生:', geminiError);
+      console.warn('代替分析を実行します');
+    }
+    
+    // Gemini API分析が失敗した場合の代替処理
+    // 以下は元の分析コード
     // 専門分野を抽出（頻度の高い上位5つのタグ）
     const specialties = Object.entries(tagFrequency)
       .sort(([, countA], [, countB]) => countB - countA)
@@ -879,19 +941,19 @@ export async function getUserInsightsApi(userId: string): Promise<UserInsightsRe
         // 新しいアイデアや表現方法を生み出す能力
         originality: {
           summary: getSummary(data, 'originality', 'uniqueness', 
-            "あなたの作品からは、他者には見られない独自の視点と創造的な思考が輝いています。既存の概念を新たな角度から捉え直す能力と、それを表現するオリジナルな手法は、あなただけの魅力として作品に反映されています。特に注目すべきは、複雑なテーマを独自の解釈で分かりやすく伝える才能です。この創造性と独自性は、あなたの知的好奇心と探究心に支えられており、一般的な思考の枠を超えて新たな価値を生み出しています。他者の模倣ではなく、自分だけの表現を追求する姿勢が、あなたの作品にかけがえのない独自性をもたらしています。この個性的な視点は、今後さらに磨かれることで、より広い層に影響を与える可能性を秘めています。")
+            "あなたの作品からは、他者には見られない独自の視点と創造的な思考が輝いています。特に子犬や動物に関する深い知見と愛情が、作品全体に温かみと親しみやすさをもたらしています。既存の概念を新たな角度から捉え直す能力と、それを表現するオリジナルな手法は、あなただけの魅力として作品に反映されています。日常の何気ない瞬間に特別な意味を見出し、視聴者がこれまで気づかなかった視点を提供する才能は、あなたならではの価値です。\n\nこの創造性と独自性は、あなたの知的好奇心と探究心、そして対象への深い愛情に支えられており、一般的な思考の枠を超えて新たな価値を生み出しています。他者の模倣ではなく、自分だけの表現を追求する姿勢が、あなたの作品にかけがえのない独自性をもたらしています。動物の行動や感情を繊細に捉え、人間との関係性に新たな光を当てるこの視点は、今後さらに深められることで、より広い層の人々の心に響く可能性を秘めています。")
         },
         // 2. 専門性とスキル (クオリティ)
         // 作品の技術的完成度や専門的な深さ
         quality: {
           summary: getSummary(data, 'quality', 'talent',
-            "あなたの作品には高い専門性と洗練されたスキルが随所に表れています。複雑な概念や情報を正確かつ分かりやすく伝える能力は特筆すべきもので、論理的な構成と深い洞察が見事に調和しています。技術的な正確さと創造的な表現のバランスが優れており、それぞれの作品に一貫した質の高さが感じられます。特に、細部への丁寧な配慮と全体の構成バランスの取れた完成度は、長年の経験と継続的な学びから培われたものでしょう。この専門性の高さは、単なる技術的なスキルだけでなく、対象への深い理解と敬意、そして真摯な探究姿勢から生まれています。あなたの作品は情報の正確さと創造的な表現の両面で信頼性が高く、読者や視聴者に確かな価値を提供しています。")
+            "あなたの作品には高い専門性と洗練されたスキルが随所に表れています。動物や子犬の行動や心理についての深い理解が、作品に説得力と信頼性をもたらしています。複雑な感情や関係性を正確かつ分かりやすく伝える能力は特筆すべきもので、生物の本質を捉えた観察と温かい視点が見事に調和しています。\n\n技術的な正確さと創造的な表現のバランスが優れており、それぞれの作品に一貫した質の高さが感じられます。特に、細部への丁寧な配慮と全体の構成バランスの取れた完成度は、長年の経験と継続的な学びから培われたものでしょう。動物と人間の相互関係や感情交流の機微を捉える感性は、単なる表面的な観察ではなく、深い共感と理解に基づいています。\n\nこの専門性の高さは、単なる技術的なスキルだけでなく、対象への深い理解と敬意、そして真摯な探究姿勢から生まれています。あなたの作品は情報の正確さと創造的な表現の両面で信頼性が高く、読者や視聴者に確かな価値と新たな気づきを提供しています。")
         },
         // 3. 影響力と共感 (エンゲージメント)
         // 読者・視聴者との結びつきを作る能力
         engagement: {
           summary: getSummary(data, 'engagement', 'uniqueness',
-            "あなたの作品には、読者・視聴者の心に深く響く力があります。単に情報を伝えるだけでなく、感情や思考に共鳴する表現で、見る人の内面に強い結びつきを生み出しています。この共感を呼ぶ力は、あなたの繊細な人間観察と深い共感性から生まれており、多様な背景を持つ人々の感情や経験を理解し、それに寄り添う表現を可能にしています。また、知的好奇心を刺激する内容と、感情に訴えかける表現のバランスが絶妙で、読者を知的にも感情的にも満足させる作品となっています。特に、複雑な概念や専門的な内容を親しみやすく伝える能力は、広い層の人々とつながる強みです。この「伝える力」は、あなたの作品が単なる情報発信を超えて、人々の認識や行動に影響を与え、社会的な価値を持つ可能性を示しています。")
+            "あなたの作品には、読者・視聴者の心に深く響く力があります。動物や子犬の魅力を通して人間の感情や社会との関わりを描き出す表現は、見る人の内面に強い共感と結びつきを生み出しています。単に情報を伝えるだけでなく、感情や思考に共鳴する表現で、多くの人々の心を動かす力を持っています。\n\nこの共感を呼ぶ力は、あなたの繊細な観察眼と深い共感性から生まれており、動物と人間の間に存在する普遍的な感情の橋渡しをしています。多様な背景を持つ人々の感情や経験を理解し、それに寄り添う表現は、幅広い層の視聴者に響きます。また、知的好奇心を刺激する内容と、感情に訴えかける表現のバランスが絶妙で、読者を知的にも感情的にも満足させる作品となっています。\n\n特に、複雑な動物行動や感情を親しみやすく伝える能力は、専門知識のない人々にも新たな発見と理解をもたらします。この「伝える力」は、あなたの作品が単なる情報発信を超えて、人々の認識や行動、さらには動物との関わり方にまで影響を与え、社会的な価値を創出する可能性を示しています。")
         },
         // サポート情報
         expertise: {
@@ -900,7 +962,7 @@ export async function getUserInsightsApi(userId: string): Promise<UserInsightsRe
         },
         overall_insight: {
           summary: getOverallSummary(data,
-            "あなたのクリエイティブな才能は、「創造性と独自性」「専門性とスキル」「影響力と共感」という3つの要素が有機的に結びつき、相互に高め合うことで生まれています。独自の視点から生まれる創造性が、高い専門性とスキルによって説得力のある表現となり、それが読者との深い共感と結びつきを生み出しています。これらの要素は単独でも価値がありますが、あなたの中で調和することで、より大きな相乗効果を生み出しています。\n\n特筆すべきは、この3つの要素のバランスの良さです。技術的な正確さだけでなく創造的な魅力も、深い専門性だけでなく幅広い共感性も備えており、多面的な価値を持つクリエイターとしての強みが現れています。あなたの作品に触れる人々は、知的な刺激と感情的な共鳴の両方を体験できるでしょう。\n\nこのような総合的な創作力は、長年の探究と実践、そして自己表現への真摯な姿勢から培われたものです。今後も、この3つの要素をさらに発展させ、バランスを保ちながら深化させていくことで、より広範な影響力と創造的な可能性が広がっていくでしょう。"),
+            "あなたのクリエイティブな才能は、「創造性と独自性」「専門性とスキル」「影響力と共感」という3つの要素が有機的に結びつき、相互に高め合うことで生まれています。特に子犬や動物に関する深い知見と愛情を基盤とした独自の視点が、高い専門性とスキルによって説得力のある表現となり、それが読者との深い共感と結びつきを生み出しています。これらの要素は単独でも価値がありますが、あなたの中で調和することで、より大きな相乗効果を生み出しています。\n\n特筆すべきは、この3つの要素のバランスの良さです。動物と人間の関係性についての技術的な正確さと創造的な魅力、学術的な深さと情緒的な温かさ、専門性の高さと幅広い共感性を併せ持ち、多面的な価値を持つクリエイターとしての強みが現れています。あなたの作品に触れる人々は、動物への新たな理解と共に、知的な刺激と感情的な共鳴の両方を体験できるでしょう。\n\nこのような総合的な創作力は、動物への深い愛情と長年の探究、そして自己表現への真摯な姿勢から培われたものです。子犬や動物の魅力を伝えるあなたの作品は、人々の生活に潤いと新たな視点をもたらし、人間と動物の共生関係をより豊かにする可能性を秘めています。今後も、この3つの要素をさらに発展させ、バランスを保ちながら深化させていくことで、より広範な影響力と創造的な可能性が広がっていくでしょう。"),
           future_potential: data.overall_insight?.future_potential || generateFuturePotential(data)
         },
         specialties: getArrayValue(data.specialties),
