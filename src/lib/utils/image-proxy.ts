@@ -18,19 +18,26 @@ const NETLIFY_FUNCTION_URL = import.meta.env.VITE_NETLIFY_FUNCTION_URL || '/.net
 export function getProxiedImageUrl(originalUrl: string): string {
   if (!originalUrl) return '';
   
+  console.log('getProxiedImageUrl - 元のURL:', originalUrl);
+  console.log('NETLIFY_FUNCTION_URL:', NETLIFY_FUNCTION_URL);
+  
   // 既にプロキシURLの場合はそのまま返す
   if (originalUrl.startsWith(NETLIFY_FUNCTION_URL) || originalUrl.startsWith('data:')) {
+    console.log('既にプロキシURLまたはdata:URLのため、そのまま返します');
     return originalUrl;
   }
   
   // 相対URLの場合はプロキシを通さない
   if (originalUrl.startsWith('/')) {
+    console.log('相対URLのため、プロキシを通しません');
     return originalUrl;
   }
   
   // URLエンコードして、プロキシURLを生成
   const encodedUrl = encodeURIComponent(originalUrl);
-  return `${NETLIFY_FUNCTION_URL}/image-proxy?url=${encodedUrl}`;
+  const proxyUrl = `${NETLIFY_FUNCTION_URL}/image-proxy?url=${encodedUrl}`;
+  console.log('生成されたプロキシURL:', proxyUrl);
+  return proxyUrl;
 }
 
 /**
@@ -41,8 +48,11 @@ export function getProxiedImageUrl(originalUrl: string): string {
  */
 export async function fetchImageViaProxy(originalUrl: string): Promise<{ blob: Blob, contentType: string }> {
   try {
+    console.log('fetchImageViaProxy - 元のURL:', originalUrl);
+    
     // 相対URLまたはdata:URLの場合はプロキシを通さない
     if (originalUrl.startsWith('/') || originalUrl.startsWith('data:')) {
+      console.log('相対URLまたはdata:URLのため、直接fetchします');
       const response = await fetch(originalUrl);
       
       if (!response.ok) {
@@ -52,16 +62,19 @@ export async function fetchImageViaProxy(originalUrl: string): Promise<{ blob: B
       const blob = await response.blob();
       const contentType = response.headers.get('Content-Type') || 'application/octet-stream';
       
+      console.log('直接fetchに成功しました。Content-Type:', contentType);
       return { blob, contentType };
     }
     
     // プロキシURLを生成
     const proxyUrl = getProxiedImageUrl(originalUrl);
+    console.log('プロキシURLを使用してfetchします:', proxyUrl);
     
     // プロキシを通してfetch
     const response = await fetch(proxyUrl);
     
     if (!response.ok) {
+      console.error('プロキシを通したfetchに失敗:', response.status, response.statusText);
       throw new Error(`画像の取得に失敗しました: ${response.status} ${response.statusText}`);
     }
     
@@ -69,6 +82,7 @@ export async function fetchImageViaProxy(originalUrl: string): Promise<{ blob: B
     const blob = await response.blob();
     const contentType = response.headers.get('Content-Type') || 'application/octet-stream';
     
+    console.log('プロキシを通したfetchに成功しました。Content-Type:', contentType);
     return { blob, contentType };
   } catch (error) {
     console.error('プロキシ経由の画像取得エラー:', error);

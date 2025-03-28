@@ -1,4 +1,5 @@
 import { GoogleGenerativeAI, HarmCategory, HarmBlockThreshold } from '@google/generative-ai';
+import { fetchImageViaProxy } from './utils/image-proxy';
 
 const GEMINI_API_KEY = import.meta.env.VITE_GEMINI_API_KEY || '';
 
@@ -16,22 +17,19 @@ interface ContentInput {
 }
 
 interface ContentAnalysis {
-  expertise: {
-    categories: Array<{ name: string; score: number }>;
-    summary: string;
-  };
-  content_style: {
+  originality: {
     features: Array<{ name: string; score: number }>;
     summary: string;
   };
-  interests: {
-    tags: string[];
+  quality: {
+    categories: Array<{ name: string; score: number }>;
     summary: string;
   };
-  appeal_points: {
+  engagement: {
     points: Array<{ title: string; description: string }>;
     summary: string;
   };
+  tags: string[];
 }
 
 // Gemini Proのモデル設定
@@ -100,44 +98,41 @@ URL: ${content.url || 'URLなし'}
 
 ## 分析指示
 このコンテンツを分析し、以下の情報を抽出してください：
-1. 専門分野カテゴリ（最大5つ、スコア付き）
-2. コンテンツスタイルの特徴（最大5つ、スコア付き）
-3. 関連する興味・タグ（最大10個）
-4. コンテンツの魅力ポイント（最大5つ、タイトルと説明付き）
+1. 創造性と独自性（最大5つ、スコア付き）
+2. 専門性とスキル（最大5つ、スコア付き）
+3. 影響力と共感（最大5つ、タイトルと説明付き）
+4. 共通のタグリスト（最大10個）
 
 ## 出力形式
 以下のJSON形式で出力してください：
 
 {
-  "expertise": {
-    "categories": [
-      {"name": "カテゴリ名", "score": 0.9},
-      {"name": "カテゴリ名", "score": 0.8}
-    ],
-    "summary": "専門性に関する簡潔な説明（1-2文）"
-  },
-  "content_style": {
+  "originality": {
     "features": [
       {"name": "特徴", "score": 0.9},
       {"name": "特徴", "score": 0.8}
     ],
-    "summary": "コンテンツスタイルに関する簡潔な説明（1-2文）"
+    "summary": "創造性と独自性に関する簡潔な説明（1-2文）"
   },
-  "interests": {
-    "tags": ["タグ1", "タグ2", "タグ3"],
-    "summary": "興味・関心に関する簡潔な説明（1-2文）"
-  },
-  "appeal_points": {
-    "points": [
-      {"title": "魅力ポイントのタイトル", "description": "詳細説明"},
-      {"title": "魅力ポイントのタイトル", "description": "詳細説明"}
+  "quality": {
+    "categories": [
+      {"name": "カテゴリ名", "score": 0.9},
+      {"name": "カテゴリ名", "score": 0.8}
     ],
-    "summary": "魅力ポイントに関する簡潔な説明（1-2文）"
-  }
+    "summary": "専門性とスキルに関する簡潔な説明（1-2文）"
+  },
+  "engagement": {
+    "points": [
+      {"title": "影響力と共感のポイントのタイトル", "description": "詳細説明"},
+      {"title": "影響力と共感のポイントのタイトル", "description": "詳細説明"}
+    ],
+    "summary": "影響力と共感に関する簡潔な説明（1-2文）"
+  },
+  "tags": ["タグ1", "タグ2", "タグ3"]
 }
 
 必ずJSON形式で出力してください。追加の説明やコメントは不要です。
-必ず日本語で回答してください。英語は使用しないでください。カテゴリ名、特徴、タグ、魅力ポイントのタイトルと説明、すべて日本語で出力してください。
+必ず日本語で回答してください。英語は使用しないでください。特徴、カテゴリ名、タグ、影響力と共感のポイントのタイトルと説明、すべて日本語で出力してください。
 `;
 
         // テキスト生成
@@ -195,17 +190,26 @@ async function analyzeImageWithText(
       throw new Error('画像URLが指定されていません');
     }
 
-    // 画像をバイナリデータとして取得
-    const imageResponse = await fetch(content.imageUrl);
-    if (!imageResponse.ok) {
-      throw new Error(`画像の取得に失敗しました: ${imageResponse.status} ${imageResponse.statusText}`);
+    console.log('画像分析を開始します。元の画像URL:', content.imageUrl);
+    
+    // プロキシを経由して画像をBase64に変換
+    let imageBase64: string;
+    let mimeType: string;
+    
+    try {
+      // プロキシ経由で画像を取得
+      console.log('fetchImageViaProxyを呼び出します...');
+      const { blob, contentType } = await fetchImageViaProxy(content.imageUrl);
+      console.log('fetchImageViaProxyからの応答を受信しました');
+      
+      console.log('blobToBase64を呼び出します...');
+      imageBase64 = await blobToBase64(blob);
+      mimeType = contentType;
+      console.log('画像の取得と変換に成功しました。MIMEタイプ:', mimeType);
+    } catch (fetchError) {
+      console.error('画像取得エラー (詳細):', fetchError instanceof Error ? fetchError.stack : String(fetchError));
+      throw new Error(`画像の取得に失敗しました: ${fetchError instanceof Error ? fetchError.message : String(fetchError)}`);
     }
-    
-    const imageBlob = await imageResponse.blob();
-    
-    // 画像をBase64に変換
-    const imageBase64 = await blobToBase64(imageBlob);
-    const mimeType = imageBlob.type;
     
     // マルチモーダルモデルを使用
     const model = genAI.getGenerativeModel({
@@ -224,46 +228,43 @@ ${content.description ? `説明: ${content.description}` : ''}
 
 ## 分析指示
 この画像を分析し、以下の情報を抽出してください：
-1. 専門分野カテゴリ（最大5つ、スコア付き）
-2. デザインスタイルの特徴（最大5つ、スコア付き）
-3. 関連する興味・タグ（最大10個）
-4. 作品の魅力ポイント（最大5つ、タイトルと説明付き）
+1. 創造性と独自性（最大5つ、スコア付き）
+2. 専門性とスキル（最大5つ、スコア付き）
+3. 影響力と共感（最大5つ、タイトルと説明付き）
+4. 共通のタグリスト（最大10個）
 
 ## 出力形式
 以下のJSON形式で出力してください：
 
 {
-  "expertise": {
-    "categories": [
-      {"name": "カテゴリ名", "score": 0.9},
-      {"name": "カテゴリ名", "score": 0.8}
-    ],
-    "summary": "専門性に関する簡潔な説明（1-2文）"
-  },
-  "content_style": {
+  "originality": {
     "features": [
       {"name": "特徴", "score": 0.9},
       {"name": "特徴", "score": 0.8}
     ],
-    "summary": "デザインスタイルに関する簡潔な説明（1-2文）"
+    "summary": "創造性と独自性に関する簡潔な説明（1-2文）"
   },
-  "interests": {
-    "tags": ["タグ1", "タグ2", "タグ3"],
-    "summary": "興味・関心に関する簡潔な説明（1-2文）"
-  },
-  "appeal_points": {
-    "points": [
-      {"title": "魅力ポイントのタイトル", "description": "詳細説明"},
-      {"title": "魅力ポイントのタイトル", "description": "詳細説明"}
+  "quality": {
+    "categories": [
+      {"name": "カテゴリ名", "score": 0.9},
+      {"name": "カテゴリ名", "score": 0.8}
     ],
-    "summary": "魅力ポイントに関する簡潔な説明（1-2文）"
-  }
+    "summary": "専門性とスキルに関する簡潔な説明（1-2文）"
+  },
+  "engagement": {
+    "points": [
+      {"title": "影響力と共感のポイントのタイトル", "description": "詳細説明"},
+      {"title": "影響力と共感のポイントのタイトル", "description": "詳細説明"}
+    ],
+    "summary": "影響力と共感に関する簡潔な説明（1-2文）"
+  },
+  "tags": ["タグ1", "タグ2", "タグ3"]
 }
 
 必ずJSON形式で出力してください。追加の説明やコメントは不要です。
-必ず日本語で回答してください。英語は使用しないでください。カテゴリ名、特徴、タグ、魅力ポイントのタイトルと説明、すべて日本語で出力してください。
+必ず日本語で回答してください。英語は使用しないでください。特徴、カテゴリ名、タグ、影響力と共感のポイントのタイトルと説明、すべて日本語で出力してください。
 `;
-
+    
     // 画像とテキストを含むコンテンツパーツを作成
     const imagePart = {
       inlineData: {
@@ -276,14 +277,19 @@ ${content.description ? `説明: ${content.description}` : ''}
       text: prompt
     };
     
+    console.log('Gemini APIにリクエストを送信します');
+    
     // マルチモーダル生成リクエスト
     const result = await model.generateContent([imagePart, textPart]);
     const response = result.response;
     const text = response.text();
     
+    console.log('Gemini APIからレスポンスを受信しました');
+    
     // JSON部分を抽出
     const jsonMatch = text.match(/\{[\s\S]*\}/);
     if (!jsonMatch) {
+      console.error('APIからの応答にJSON形式のデータが含まれていません:', text.substring(0, 200));
       throw new Error('APIからの応答にJSON形式のデータが含まれていません');
     }
     
@@ -323,30 +329,27 @@ function blobToBase64(blob: Blob): Promise<string> {
 // フォールバック分析を返す関数
 function getFallbackAnalysis(): ContentAnalysis {
   return {
-    expertise: {
+    originality: {
+      features: [
+        { name: "一般", score: 0.8 },
+        { name: "未分類", score: 0.7 }
+      ],
+      summary: "APIキーが設定されていないため、詳細な分析ができませんでした。"
+    },
+    quality: {
       categories: [
         { name: "一般", score: 0.8 },
         { name: "未分類", score: 0.7 }
       ],
       summary: "APIキーが設定されていないため、詳細な分析ができませんでした。"
     },
-    content_style: {
-      features: [
-        { name: "標準", score: 0.8 },
-        { name: "一般的", score: 0.7 }
-      ],
-      summary: "APIキーが設定されていないため、詳細な分析ができませんでした。"
-    },
-    interests: {
-      tags: ["一般", "その他"],
-      summary: "APIキーが設定されていないため、詳細な分析ができませんでした。"
-    },
-    appeal_points: {
+    engagement: {
       points: [
         { title: "基本情報", description: "コンテンツの基本情報が含まれています。" }
       ],
       summary: "APIキーが設定されていないため、詳細な分析ができませんでした。"
-    }
+    },
+    tags: ["一般", "その他"]
   };
 }
 
