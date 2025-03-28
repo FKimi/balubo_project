@@ -195,18 +195,27 @@ async function analyzeUserWorksWithClientAuth(userWorks: any[], userId: string) 
     // タグの頻度を計算
     const tagFrequency: { [key: string]: number } = {};
     const allTags: string[] = [];
+    const tagCategories: { [key: string]: string } = {}; // タグのカテゴリを保存
     
     if (workTagsData && workTagsData.length > 0) {
       workTagsData.forEach((tagItem: any) => {
         if (tagItem.tags && tagItem.tags.name) {
           const tagName = tagItem.tags.name;
+          const tagCategory = tagItem.tags.category || 'uncategorized';
+          
           tagFrequency[tagName] = (tagFrequency[tagName] || 0) + 1;
           allTags.push(tagName);
+          
+          // タグのカテゴリ情報を保存
+          if (!tagCategories[tagName]) {
+            tagCategories[tagName] = tagCategory;
+          }
         }
       });
     }
     
     console.log('計算されたタグ頻度:', tagFrequency);
+    console.log('タグカテゴリ:', tagCategories);
     
     // 専門分野を抽出（頻度の高い上位5つのタグ）
     const specialties = Object.entries(tagFrequency)
@@ -218,17 +227,135 @@ async function analyzeUserWorksWithClientAuth(userWorks: any[], userId: string) 
     const interestAreas = [...new Set(allTags)].slice(0, 8);
     const interestTopics = [...new Set(allTags)].slice(0, 4);
     
+    // カテゴリごとのタグを集計
+    const categorizedTags: { [key: string]: string[] } = {};
+    Object.entries(tagCategories).forEach(([tagName, category]) => {
+      if (!categorizedTags[category]) {
+        categorizedTags[category] = [];
+      }
+      categorizedTags[category].push(tagName);
+    });
+    
+    console.log('カテゴリ別タグ:', categorizedTags);
+    
+    // デザインスタイルの抽出 (デザイン関連カテゴリからのタグ)
+    const designRelatedCategories = ['design', 'style', 'visual', 'art', 'graphic'];
+    const designStyleTags: string[] = [];
+    
+    Object.entries(categorizedTags).forEach(([category, tags]) => {
+      if (designRelatedCategories.some(term => category.toLowerCase().includes(term))) {
+        designStyleTags.push(...tags);
+      }
+    });
+    
+    // デザインスタイルがない場合は上位タグから抽出
+    const designStyles = designStyleTags.length > 0 ? 
+      designStyleTags.slice(0, 4) : 
+      ["ミニマリスト", "モダン", "クリーン", "機能的"];
+    
+    // 作品の分析から得られた洞察に基づいて動的コメントを生成
+    const generateDynamicComment = (tags: string[], specialtyTags: string[]) => {
+      // トップタグに基づいて特性を判断
+      const topTags = specialtyTags.slice(0, 3);
+      const allTagsText = topTags.join('、');
+      
+      // タグの数に基づく特性
+      const tagDiversity = allTags.length > 10 ? '多様な' : '特定の';
+      const focusLevel = allTags.length < 8 ? '専門的で深い' : '幅広い';
+      
+      // タグの種類から特性を判断
+      const isTechnical = topTags.some(tag => 
+        ['プログラミング', 'コーディング', '開発', 'エンジニアリング', 'テクニカル'].some(term => 
+          tag.toLowerCase().includes(term)
+        )
+      );
+      
+      const isCreative = topTags.some(tag => 
+        ['デザイン', 'クリエイティブ', 'アート', '創作', '表現'].some(term => 
+          tag.toLowerCase().includes(term)
+        )
+      );
+      
+      const isAnalytical = topTags.some(tag => 
+        ['分析', 'データ', '調査', 'リサーチ', '評価'].some(term => 
+          tag.toLowerCase().includes(term)
+        )
+      );
+      
+      // 特性に基づいた説明文生成
+      let originalitySummary = `独自の視点と表現スタイルを持っています。${allTagsText}に関して特に深い知見を示し、既存の概念に独自の解釈を加えています。`;
+      
+      if (isCreative) {
+        originalitySummary += `クリエイティブな発想力と${tagDiversity}表現手法が特徴的です。`;
+      } else if (isTechnical) {
+        originalitySummary += `技術的なアプローチと実装における独自の工夫が見られます。`;
+      } else if (isAnalytical) {
+        originalitySummary += `データと洞察に基づいた説得力のある視点を提供しています。`;
+      } else {
+        originalitySummary += `特に、日常的な題材を独自の視点で捉え直す能力が際立っています。`;
+      }
+      
+      // 将来の可能性についてのコメント
+      let futurePotential = `今後、異なる分野の知識を組み合わせることで、さらに独自性を高める可能性があります。`;
+      
+      if (isCreative) {
+        futurePotential += `新たな表現技法や媒体の探究が魅力をさらに高めるでしょう。`;
+      } else if (isTechnical) {
+        futurePotential += `新しい技術やフレームワークの習得により、さらに可能性が広がるでしょう。`;
+      } else if (isAnalytical) {
+        futurePotential += `より高度な分析手法の導入により、さらに深い洞察を提供できるようになるでしょう。`;
+      } else {
+        futurePotential += `新たな表現方法の探求も魅力を高めます。`;
+      }
+      
+      // 質に関するコメント
+      let qualitySummary = `${focusLevel}専門性とスキルを持ち、信頼性のあるコンテンツを作成できます。`;
+      
+      if (isCreative) {
+        qualitySummary += `視覚的要素と表現の質が高く、オリジナリティと完成度のバランスが取れています。`;
+      } else if (isTechnical) {
+        qualitySummary += `技術的な正確さと効率性を重視した実装が特徴で、高品質な成果物を生み出します。`;
+      } else if (isAnalytical) {
+        qualitySummary += `情報の正確性と深さが読者に安心感を与え、専門知識を持つ読者からも評価される内容です。`;
+      } else {
+        qualitySummary += `文章の構成が論理的で、主張と根拠のバランスが取れています。`;
+      }
+      
+      // エンゲージメントに関するコメント
+      let engagementSummary = `読者の共感を得やすい親しみやすい文体と、信頼性を感じさせる根拠に基づいた内容のバランスが取れています。`;
+      
+      if (isCreative) {
+        engagementSummary += `視覚的魅力と感情に訴える表現で、閲覧者の関心を引きつけます。`;
+      } else if (isTechnical) {
+        engagementSummary += `複雑な概念をわかりやすく説明する能力があり、専門家と初心者の両方に価値を提供します。`;
+      } else if (isAnalytical) {
+        engagementSummary += `データに裏付けられた洞察と明確な説明で、読者の知的好奇心を刺激します。`;
+      } else {
+        engagementSummary += `感情に訴えかける表現と、知的好奇心を刺激する情報提供が効果的に組み合わされています。`;
+      }
+      
+      return {
+        originality: originalitySummary,
+        future: futurePotential,
+        quality: qualitySummary,
+        engagement: engagementSummary
+      };
+    };
+    
+    // 動的コメントの生成
+    const dynamicComments = generateDynamicComment(allTags, specialties);
+    
     // 分析結果オブジェクトを作成
     const analysisResult = {
       // 1. 創造性と独自性 (オリジナリティ)
       // 新しいアイデアや表現方法を生み出す能力
       originality: { 
-        summary: "独自の視点と表現スタイルを持っています。テーマや題材に対して新しいアプローチを取り入れ、既存の概念に独自の解釈を加えています。特に、日常的な題材を独自の視点で捉え直す能力が際立っています。"
+        summary: dynamicComments.originality
       },
       // 2. 専門性とスキル (クオリティ)
       // 作品の技術的完成度や専門的な深さ
       quality: { 
-        summary: "専門性とスキルが高く、信頼性のあるコンテンツを作成できます。文章の構成が論理的で、主張と根拠のバランスが取れています。情報の正確性と深さが読者に安心感を与え、専門知識を持つ読者からも評価される内容です。"
+        summary: dynamicComments.quality
       },
       // サポート情報
       expertise: { 
@@ -237,19 +364,19 @@ async function analyzeUserWorksWithClientAuth(userWorks: any[], userId: string) 
       // 3. 影響力と共感 (エンゲージメント)
       // 読者・視聴者との結びつきを作る能力
       engagement: { 
-        summary: "読者の共感を得やすい親しみやすい文体と、信頼性を感じさせる根拠に基づいた内容のバランスが取れています。感情に訴えかける表現と、知的好奇心を刺激する情報提供が効果的に組み合わされており、幅広い読者層に響く内容となっています。"
+        summary: dynamicComments.engagement
       },
       // 総合的な考察
       overall_insight: {
         summary: "これらの要素は相互に関連し合い、クリエイターとしての総合的な価値を形成しています。独自の視点と専門性の高さが作品の質を高め、読みやすい文体と共感を呼ぶ内容が読者との強い結びつきを生み出しています。特に、専門的な内容を親しみやすく伝える能力は、このクリエイターの最大の強みと言えるでしょう。",
-        future_potential: "今後は、さらに多様なテーマに挑戦することで表現の幅を広げ、より多くの読者層にアプローチできる可能性があります。また、視覚的要素や対話型コンテンツなど、異なるメディア形式との融合も検討すると、クリエイターとしての価値をさらに高められるでしょう。"
+        future_potential: dynamicComments.future
       },
       specialties: specialties,
       interests: { 
         areas: interestAreas,
         topics: interestTopics
       },
-      design_styles: ["ミニマリスト", "モダン", "クリーン", "機能的"],
+      design_styles: designStyles,
       tag_frequency: tagFrequency
     };
     
@@ -703,6 +830,47 @@ export async function getUserInsightsApi(userId: string): Promise<UserInsightsRe
     
     console.log('データベースから取得した生のインサイトデータ:', data);
     
+    // 将来の可能性に関するコメントを生成するヘルパー関数
+    const generateFuturePotential = (data: any) => {
+      const specialties = getArrayValue(data.specialties);
+      const topSpecialties = specialties.slice(0, 3);
+      
+      // 特定のキーワードに基づいて異なるコメントを生成
+      const isCreative = topSpecialties.some(tag => 
+        ['デザイン', 'クリエイティブ', 'アート', '創作', '表現'].some(term => 
+          tag.toLowerCase().includes(term)
+        )
+      );
+      
+      const isTechnical = topSpecialties.some(tag => 
+        ['プログラミング', 'コーディング', '開発', 'エンジニアリング', 'テクニカル'].some(term => 
+          tag.toLowerCase().includes(term)
+        )
+      );
+      
+      const isAnalytical = topSpecialties.some(tag => 
+        ['分析', 'データ', '調査', 'リサーチ', '評価'].some(term => 
+          tag.toLowerCase().includes(term)
+        )
+      );
+      
+      // ベースとなるコメント
+      let futurePotential = '今後、異なる分野の知識を組み合わせることで、さらに独自性を高める可能性があります。';
+      
+      // 特性に基づいた追加コメント
+      if (isCreative) {
+        futurePotential += '新たな表現技法や媒体の探究が魅力をさらに高めるでしょう。多様な創作活動を通じて、より幅広いオーディエンスに届けられる可能性があります。';
+      } else if (isTechnical) {
+        futurePotential += '新しい技術やフレームワークの習得により、さらに可能性が広がるでしょう。技術の深化とともに、より複雑な課題に取り組める専門性を高められます。';
+      } else if (isAnalytical) {
+        futurePotential += 'より高度な分析手法の導入により、さらに深い洞察を提供できるようになるでしょう。データの関連性を見出す能力は、様々な分野で価値を生み出します。';
+      } else {
+        futurePotential += '新たな表現方法の探求も魅力を高めます。自分の強みを活かしながら、好奇心を持って探求を続けることが、長期的な成長につながります。';
+      }
+      
+      return futurePotential;
+    };
+    
     // データ形式の正規化 - 3つの主要指標を強調
     const normalizedData = {
       success: true,
@@ -733,8 +901,7 @@ export async function getUserInsightsApi(userId: string): Promise<UserInsightsRe
         overall_insight: {
           summary: getOverallSummary(data,
             "これらの要素は相互に関連し合い、クリエイターとしての総合的な価値を形成しています。独自の視点と専門性の高さが作品の質を高め、読みやすい文体と共感を呼ぶ内容が読者との強い結びつきを生み出しています。特に、専門的な内容を親しみやすく伝える能力は、このクリエイターの最大の強みと言えるでしょう。"),
-          future_potential: getFuturePotential(data,
-            "今後は、さらに多様なテーマに挑戦することで表現の幅を広げ、より多くの読者層にアプローチできる可能性があります。また、視覚的要素や対話型コンテンツなど、異なるメディア形式との融合も検討すると、クリエイターとしての価値をさらに高められるでしょう。")
+          future_potential: data.overall_insight?.future_potential || generateFuturePotential(data)
         },
         specialties: getArrayValue(data.specialties),
         interests: {
@@ -800,16 +967,6 @@ function getSummary(data: any, primaryField: string, alternativeField: string = 
 function getOverallSummary(data: any, defaultValue: string): string {
   if (typeof data.overall_insight === 'object' && data.overall_insight !== null) {
     return data.overall_insight.summary || defaultValue;
-  }
-  return defaultValue;
-}
-
-/**
- * 将来の可能性に関する情報を取得するヘルパー関数
- */
-function getFuturePotential(data: any, defaultValue: string): string {
-  if (typeof data.overall_insight === 'object' && data.overall_insight !== null) {
-    return data.overall_insight.future_potential || defaultValue;
   }
   return defaultValue;
 }
