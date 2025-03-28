@@ -425,7 +425,7 @@ function LandingPage() {
               </button>
             </div>
             <p className="mt-6 text-sm text-gray-500">
-              アカウント作成は完全無料。クレジットカードは必要ありません。
+              感想・お問い合わせは「<a href="https://docs.google.com/spreadsheets/d/1nfcbO8H1DkpfYocAIQmoAWTGpPwJe_Etj-vWw9RvT-Y/edit?gid=0#gid=0" target="_blank" rel="noopener noreferrer" className="text-indigo-600 hover:underline">baluboのぼやきBOX</a>」まで
             </p>
           </div>
         </div>
