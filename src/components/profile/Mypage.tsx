@@ -467,10 +467,7 @@ const Mypage: React.FC = () => {
       setAiAnalysisResult(analysisResult);
       
       setHasAnalysis(true);
-      toast({
-        title: 'タグ分析が完了しました',
-        description: 'あなたの作品のタグに基づいて専門性やスタイルを分析しました',
-      });
+      // ページの初期ロード時のポップアップは表示しない（明示的なAI分析実行時のみ表示）
     } catch (error) {
       console.error('Error analyzing user tags:', error);
       toast({
@@ -669,6 +666,7 @@ const Mypage: React.FC = () => {
       setAiAnalysisResult(resultData);
       
       setHasAnalysis(true);
+      // ユーザーが明示的に「AI分析を実行」ボタンを押した場合にのみポップアップを表示
       toast({
         title: 'タグ分析が完了しました',
         description: 'あなたの作品のタグに基づいて専門性やスタイルを分析しました',
@@ -1472,7 +1470,7 @@ const Mypage: React.FC = () => {
                   <h4 className="text-md font-semibold">AI分析について</h4>
                 </div>
                 <p className="text-sm text-gray-600" data-component-name="Mypage">
-                  クリエイターの価値を測る要素や指標は数多く存在し、その表現形態や分野によっても異なります。その中でも特に重要と考えられる以下の3つの要素から分析を行い、あなたの独自の強みと可能性を明らかにしています。
+                  クリエイターの価値を測る要素として、特に重要な「創造性と独自性」の面では優れた特徴を示しています。既存の枠組みにとらわれない独自の視点と表現スタイルを持ち、テーマや題材に対して新しいアプローチを取り入れています。一般的な考え方や表現に独自の解釈を加え、オリジナリティあふれる作品を生み出す能力が際立っています。この創造性は、あなたの作品に唯一無二の価値をもたらしています。
                 </p>
               </div>
 
