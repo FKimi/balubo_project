@@ -112,7 +112,7 @@ export async function testSupabaseAdminConnection() {
     }
     
     // 簡単なクエリを実行してみる
-    const { data, error, count } = await supabaseAdmin
+    const { error, count } = await supabaseAdmin
       .from('profiles')
       .select('*', { count: 'exact', head: true });
       
@@ -333,13 +333,18 @@ export const fetchAIAnalysisWithAdmin = async (userId: string) => {
         // 分析結果がまだない場合
         return { 
           data: {
-            expertise: 'このユーザーはまだAI分析を実行していません。',
-            talent: 'AI分析が実行されると、ユーザーの才能や特徴が表示されます。',
-            uniqueness: '独自の視点と表現スタイルを持っています',
-            content_style: 'AI分析が実行されると、コンテンツスタイルが表示されます。',
+            originality: { summary: 'このユーザーはまだAI分析を実行していません。' },
+            quality: { summary: 'AI分析が実行されると、ユーザーの専門性やスキルが表示されます。' },
+            expertise: { summary: 'データに基づいた分析と創造的な表現を組み合わせた独自のアプローチが特徴です。' },
+            engagement: { summary: 'AI分析が実行されると、ユーザーの影響力や共感が表示されます。' },
+            overall_insight: {
+              summary: 'AI分析を実行すると、ユーザーの総合的な分析結果が表示されます。',
+              future_potential: '分析を実行して、ユーザーの将来性や可能性を確認しましょう。'
+            },
             specialties: ['ライティング', 'コンテンツ制作', 'クリエイティブ'],
             design_styles: ['シンプル', '明快', '効果的'],
-            interests: { areas: ['コンテンツマーケティング', 'デジタルメディア', 'クリエイティブ表現'] }
+            interests: { areas: ['コンテンツマーケティング', 'デジタルメディア', 'クリエイティブ表現'] },
+            tag_frequency: {}
           }, 
           error: null 
         };
@@ -348,28 +353,32 @@ export const fetchAIAnalysisWithAdmin = async (userId: string) => {
       return { data: null, error: handleAdminError(error) };
     }
     
-    // データを文字列形式に変換
+    // データを適切な形式に変換
     const formattedData = {
+      originality: typeof data.originality === 'object' ? 
+        data.originality : { summary: data.originality || '創造性と独自性の分析結果がまだありません' },
+      
+      quality: typeof data.quality === 'object' ? 
+        data.quality : { summary: data.quality || '専門性とスキルの分析結果がまだありません' },
+      
       expertise: typeof data.expertise === 'object' ? 
-        (data.expertise?.summary || '専門性の分析結果がまだありません') : 
-        (data.expertise || '専門性の分析結果がまだありません'),
+        data.expertise : { summary: data.expertise || 'データに基づいた分析と創造的な表現を組み合わせた独自のアプローチが特徴です。' },
       
-      talent: typeof data.talent === 'object' ? 
-        (data.talent?.summary || 'タレントの分析結果がまだありません') : 
-        (data.talent || 'タレントの分析結果がまだありません'),
+      engagement: typeof data.engagement === 'object' ? 
+        data.engagement : { summary: data.engagement || 'AI分析が実行されると、ユーザーの影響力や共感が表示されます。' },
       
-      uniqueness: typeof data.uniqueness === 'object' ? 
-        (data.uniqueness?.summary || 'ユニークさの分析結果がまだありません') : 
-        (data.uniqueness || 'ユニークさの分析結果がまだありません'),
-      
-      content_style: typeof data.content_style === 'object' ? 
-        (data.content_style?.summary || 'コンテンツスタイルの分析結果がまだありません') : 
-        (data.content_style || 'コンテンツスタイルの分析結果がまだありません'),
+      // 総合的な考察を追加
+      overall_insight: typeof data.overall_insight === 'object' ? 
+        data.overall_insight : {
+          summary: data.overall_insight || 'これらの要素は相互に関連し合い、クリエイターとしての総合的な価値を形成しています。',
+          future_potential: '創造性と情熱は、今後さらに多くの可能性を広げていくでしょう。'
+        },
       
       // タグデータを追加
       specialties: data.specialties || [],
       design_styles: data.design_styles || [],
-      interests: data.interests || { areas: [] }
+      interests: data.interests || { areas: [] },
+      tag_frequency: data.tag_frequency || {}
     };
     
     return { data: formattedData, error: null };
@@ -447,25 +456,17 @@ export const fetchWorkAnalysisWithAdmin = async (workId: string) => {
     // データを文字列形式に変換
     if (data && data.result) {
       const formattedResult = {
-        expertise: typeof data.result.expertise === 'object' ? 
-          (data.result.expertise.summary || '専門性の分析結果がまだありません') : 
-          (data.result.expertise || '専門性の分析結果がまだありません'),
+        originality: typeof data.result.originality === 'object' ? 
+          (data.result.originality.summary || '創造性と独自性の分析結果がまだありません') : 
+          (data.result.originality || '創造性と独自性の分析結果がまだありません'),
         
-        content_style: typeof data.result.content_style === 'object' ? 
-          (data.result.content_style.summary || 'スタイルの分析結果がまだありません') : 
-          (data.result.content_style || 'スタイルの分析結果がまだありません'),
+        quality: typeof data.result.quality === 'object' ? 
+          (data.result.quality.summary || '専門性とスキルの分析結果がまだありません') : 
+          (data.result.quality || '専門性とスキルの分析結果がまだありません'),
         
-        uniqueness: typeof data.result.uniqueness === 'object' ? 
-          (data.result.uniqueness.summary || 'ユニークさの分析結果がまだありません') : 
-          (data.result.uniqueness || 'ユニークさの分析結果がまだありません'),
-        
-        interests: typeof data.result.interests === 'object' ? 
-          (data.result.interests.summary || '興味の分析結果がまだありません') : 
-          (data.result.interests || '興味の分析結果がまだありません'),
-        
-        appeal_points: typeof data.result.appeal_points === 'object' ? 
-          (data.result.appeal_points.summary || 'アピールポイントの分析結果がまだありません') : 
-          (data.result.appeal_points || 'アピールポイントの分析結果がまだありません')
+        engagement: typeof data.result.engagement === 'object' ? 
+          (data.result.engagement.summary || '影響力と共感の分析結果がまだありません') : 
+          (data.result.engagement || '影響力と共感の分析結果がまだありません')
       };
       
       return { data: { ...data, result: formattedResult }, error: null };
