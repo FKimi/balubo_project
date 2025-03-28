@@ -30,14 +30,24 @@
   PUPPETEER_SKIP_CHROMIUM_DOWNLOAD = "true"
   NETLIFY_NEXT_PLUGIN_SKIP = "true"
 
+# 認証エラーのリダイレクト設定
 [[redirects]]
-  from = "/*"
-  to = "/index.html"
+  from = "/auth-error"
+  to = "/public/error.html"
   status = 200
+  force = true
 
+# API エンドポイントリダイレクト
 [[redirects]]
   from = "/api/*"
   to = "/.netlify/functions/:splat"
+  status = 200
+  force = true
+
+# SPA の標準リダイレクト
+[[redirects]]
+  from = "/*"
+  to = "/index.html"
   status = 200
 
 [[edge_functions]]

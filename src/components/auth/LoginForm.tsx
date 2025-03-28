@@ -1,7 +1,7 @@
-import React, { useState } from 'react';
-import { supabase } from '../lib/supabase';
-import { ArrowLeft } from 'lucide-react';
-import { useNavigate } from 'react-router-dom';
+import React, { useState, useEffect } from 'react';
+import { supabase, resetAuthState } from '../../lib/supabase';
+import { ArrowLeft, AlertTriangle } from 'lucide-react';
+import { useNavigate, useLocation } from 'react-router-dom';
 
 export function LoginForm() {
   const [email, setEmail] = useState('');
@@ -9,7 +9,42 @@ export function LoginForm() {
   const [loading, setLoading] = useState(false);
   const [googleLoading, setGoogleLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [authReset, setAuthReset] = useState(false);
   const navigate = useNavigate();
+  const location = useLocation();
+
+  // URLパラメータからエラー情報を取得
+  useEffect(() => {
+    const params = new URLSearchParams(location.search);
+    const errorParam = params.get('error');
+    const errorDescription = params.get('error_description');
+
+    if (errorParam) {
+      setError(`${errorParam}: ${errorDescription || '認証エラーが発生しました'}`);
+    }
+
+    // セッション期限切れまたはリフレッシュトークンエラーがURLに含まれている場合、
+    // または前回のセッションで問題があった場合は認証状態をリセット
+    const needsReset = params.get('reset') === 'true' || 
+                        errorParam === 'session_expired' ||
+                        localStorage.getItem('auth_error') === 'true';
+    
+    if (needsReset) {
+      handleAuthReset();
+    }
+  }, [location]);
+
+  // 認証状態のリセットを行う関数
+  const handleAuthReset = async () => {
+    try {
+      setAuthReset(true);
+      await resetAuthState();
+      localStorage.removeItem('auth_error');
+      setAuthReset(false);
+    } catch (err) {
+      console.error('認証リセットエラー:', err);
+    }
+  };
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -17,6 +52,11 @@ export function LoginForm() {
     setError(null);
 
     try {
+      // ログイン前に現在の認証状態をリセット（オプション）
+      if (authReset) {
+        await resetAuthState();
+      }
+
       const { error } = await supabase.auth.signInWithPassword({
         email,
         password,
@@ -24,10 +64,33 @@ export function LoginForm() {
 
       if (error) throw error;
 
+      // エラーフラグをクリア
+      localStorage.removeItem('auth_error');
+      
       // Login successful
       navigate('/mypage');
     } catch (err) {
-      setError(err instanceof Error ? err.message : 'ログイン中にエラーが発生しました');
+      // 認証エラーの場合、フラグを設定
+      if (err && typeof err === 'object' && '__isAuthError' in err) {
+        localStorage.setItem('auth_error', 'true');
+      }
+      
+      let errorMessage = 'ログイン中にエラーが発生しました';
+      
+      if (err instanceof Error) {
+        errorMessage = err.message;
+        
+        // 特定のエラーメッセージをより分かりやすく変換
+        if (err.message.includes('Invalid login')) {
+          errorMessage = 'メールアドレスまたはパスワードが正しくありません';
+        } else if (err.message.includes('refresh_token_not_found')) {
+          errorMessage = 'セッションの有効期限が切れました。再度ログインしてください。';
+          // リフレッシュトークンエラーの場合は認証状態をリセット
+          await handleAuthReset();
+        }
+      }
+      
+      setError(errorMessage);
     } finally {
       setLoading(false);
     }
@@ -38,6 +101,11 @@ export function LoginForm() {
     setError(null);
     
     try {
+      // Google認証前に現在の認証状態をリセット（オプション）
+      if (authReset) {
+        await resetAuthState();
+      }
+      
       const { error } = await supabase.auth.signInWithOAuth({
         provider: 'google',
         options: {
@@ -49,7 +117,13 @@ export function LoginForm() {
       
       // Google認証はリダイレクトするため、ここではnavigateは不要
     } catch (err) {
-      setError(err instanceof Error ? err.message : 'Googleログイン中にエラーが発生しました');
+      let errorMessage = 'Googleログイン中にエラーが発生しました';
+      
+      if (err instanceof Error) {
+        errorMessage = err.message;
+      }
+      
+      setError(errorMessage);
       setGoogleLoading(false);
     }
   };
@@ -80,12 +154,22 @@ export function LoginForm() {
 
       <div className="mt-8 sm:mx-auto sm:w-full sm:max-w-md">
         <div className="bg-white py-8 px-4 shadow sm:rounded-lg sm:px-10">
+          {authReset && (
+            <div className="mb-4 p-3 bg-blue-50 rounded-md border border-blue-100 flex items-start">
+              <AlertTriangle className="w-5 h-5 text-blue-500 mr-2 mt-0.5" />
+              <div>
+                <p className="text-sm text-blue-700">認証状態をリセットしています...</p>
+                <p className="text-xs text-blue-600 mt-1">前回のセッションで問題が発生したため、安全のためにログイン状態がリセットされました。</p>
+              </div>
+            </div>
+          )}
+          
           {/* Googleログインボタン */}
           <div className="mb-6">
             <button
               type="button"
               onClick={handleGoogleSignIn}
-              disabled={googleLoading}
+              disabled={googleLoading || authReset}
               className="flex w-full justify-center items-center gap-3 rounded-md border border-gray-300 bg-white py-2 px-4 text-sm font-medium text-gray-700 shadow-sm hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:ring-offset-2 disabled:opacity-50 disabled:cursor-not-allowed"
             >
               {googleLoading ? (
@@ -169,10 +253,10 @@ export function LoginForm() {
             <div>
               <button
                 type="submit"
-                disabled={loading}
+                disabled={loading || authReset}
                 className="flex w-full justify-center rounded-md border border-transparent bg-indigo-600 py-2 px-4 text-sm font-medium text-white shadow-sm hover:bg-indigo-700 focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:ring-offset-2 disabled:opacity-50 disabled:cursor-not-allowed"
               >
-                {loading ? 'ログイン中...' : 'ログイン'}
+                {loading ? 'ログイン中...' : authReset ? '準備中...' : 'ログイン'}
               </button>
             </div>
           </form>
