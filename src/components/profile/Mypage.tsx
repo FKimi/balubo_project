@@ -1217,43 +1217,13 @@ ${topTags[0] || 'クリエイティブ表現'}と${topTags[1] || 'コンテン�
             <div className="flex items-center space-x-4">
               <div ref={addWorkButtonRef} className="relative inline-block text-left">
                 <button
-                  onClick={toggleAddWorkMenu}
+                  onClick={() => navigate('/works/new')}
                   className="inline-flex items-center px-3 py-2 border border-gray-300 shadow-sm text-sm font-medium rounded-md text-gray-700 bg-white hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-indigo-500"
                   aria-label="作品を追加"
                 >
                   <PlusCircle className="mr-2 h-4 w-4" />
                   作品を追加
                 </button>
-                {showAddWorkMenu && (
-                  <div className="origin-top-right absolute right-0 mt-2 w-56 rounded-md shadow-lg bg-white ring-1 ring-black ring-opacity-5 focus:outline-none z-10">
-                    <div className="py-1">
-                      <button
-                        onClick={() => handleAddWorkType('writing')}
-                        className="flex items-center w-full px-4 py-3 text-sm text-gray-700 hover:bg-gray-100 hover:text-gray-900"
-                      >
-                        <div className="w-8 h-8 bg-green-100 rounded-full flex items-center justify-center mr-3">
-                          <FileType className="h-4 w-4 text-green-600" />
-                        </div>
-                        <div className="text-left">
-                          <span className="font-medium">ウェブ</span>
-                          <p className="text-xs text-gray-500">記事・ブログなど</p>
-                        </div>
-                      </button>
-                      <button
-                        onClick={() => handleAddWorkType('design')}
-                        className="flex items-center w-full px-4 py-3 text-sm text-gray-700 hover:bg-gray-100 hover:text-gray-900"
-                      >
-                        <div className="w-8 h-8 bg-yellow-100 rounded-full flex items-center justify-center mr-3">
-                          <Image className="h-4 w-4 text-yellow-600" />
-                        </div>
-                        <div className="text-left">
-                          <span className="font-medium">画像 & ファイル</span>
-                          <p className="text-xs text-gray-500">デザイン・写真など</p>
-                        </div>
-                      </button>
-                    </div>
-                  </div>
-                )}
               </div>
               <button
                 onClick={handleLogout}
