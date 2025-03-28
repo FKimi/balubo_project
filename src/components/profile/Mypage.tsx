@@ -550,9 +550,11 @@ const Mypage: React.FC = () => {
     
     try {
       setIsAnalyzing(true);
+      console.log('AI分析を開始します - ユーザーID:', userProfile.id);
       
       // 作品がない場合はエラーメッセージを表示
       if (works.length === 0) {
+        console.error('分析エラー: 作品が存在しません');
         toast({
           title: '分析できません',
           description: '作品がありません。作品を追加してから再度お試しください。',
@@ -577,6 +579,7 @@ const Mypage: React.FC = () => {
       
       // タグがない場合はエラーメッセージを表示
       if (totalTags === 0) {
+        console.error('分析エラー: 作品にタグが存在しません');
         toast({
           title: '分析できません',
           description: '作品にタグがありません。作品にタグを追加してから再度お試しください。',
@@ -590,15 +593,10 @@ const Mypage: React.FC = () => {
       console.log('タグの総数:', totalTags);
       
       // サービスロールキーの存在を確認（デバッグ用）
-      const hasServiceKey = 
-        (typeof import.meta !== 'undefined' && 
-         import.meta.env && 
-         import.meta.env.VITE_SUPABASE_SERVICE_ROLE_KEY) ||
-        (typeof process !== 'undefined' && 
-         process.env && 
-         process.env.SUPABASE_SERVICE_ROLE_KEY);
+      const hasServiceKey = !!import.meta.env.VITE_SUPABASE_SERVICE_ROLE_KEY;
       
-      console.log('サービスロールキーの存在:', !!hasServiceKey);
+      console.log('サービスロールキーの存在:', hasServiceKey);
+      console.log('APIを使用して分析を実行します');
       
       // 常にAPIを使用する（改良版APIはサービスロールキーがなくても動作する）
       console.log('analyzeUserTagsApi関数を実行します（ユーザーID:', userProfile.id, '）');
@@ -610,6 +608,13 @@ const Mypage: React.FC = () => {
         console.log('API関数の実行結果:', result);
       } catch (apiError) {
         console.error('API実行中に例外が発生:', apiError);
+        if (apiError instanceof Error) {
+          console.error('エラーメッセージ:', apiError.message);
+          console.error('スタックトレース:', apiError.stack);
+        } else {
+          console.error('不明なエラー型:', typeof apiError);
+        }
+        
         // エラー処理
         toast({
           title: 'API実行エラー',
@@ -660,6 +665,7 @@ const Mypage: React.FC = () => {
         }
       };
       
+      console.log('分析結果をUIに反映します:', resultData);
       setAiAnalysisResult(resultData);
       
       setHasAnalysis(true);
@@ -669,6 +675,13 @@ const Mypage: React.FC = () => {
       });
     } catch (error) {
       console.error('タグ分析エラー:', error);
+      if (error instanceof Error) {
+        console.error('エラーメッセージ:', error.message);
+        console.error('スタックトレース:', error.stack);
+      } else {
+        console.error('不明なエラー型:', typeof error);
+      }
+      
       toast({
         title: 'タグ分析に失敗しました',
         description: error instanceof Error ? error.message : '不明なエラーが発生しました',

@@ -122,53 +122,43 @@ export async function analyzeUserTagsApi(userId: string): Promise<UserInsightsRe
   try {
     console.log(`ユーザー ${userId} のタグを分析します...`);
     
-    // サービスロールキーの存在チェック
-    const hasServiceRoleKey = 
-      (typeof import.meta !== 'undefined' && 
-       import.meta.env && 
-       import.meta.env.VITE_SUPABASE_SERVICE_ROLE_KEY) ||
-      (typeof process !== 'undefined' && 
-       process.env && 
-       process.env.SUPABASE_SERVICE_ROLE_KEY);
+    // 環境変数の詳細なログ出力 (デバッグ用)
+    console.log('環境変数状態:');
+    console.log('環境モード:', import.meta.env.MODE);
+    console.log('VITE_SUPABASE_URL=', typeof import.meta.env.VITE_SUPABASE_URL, 
+      import.meta.env.VITE_SUPABASE_URL ? import.meta.env.VITE_SUPABASE_URL.substring(0, 10) + '...' : 'undefined');
+    console.log('VITE_SUPABASE_ANON_KEY=', typeof import.meta.env.VITE_SUPABASE_ANON_KEY,
+      import.meta.env.VITE_SUPABASE_ANON_KEY ? 'exists' : 'undefined');
     
-    console.log('サービスロールキー存在:', !!hasServiceRoleKey);
+    // 常にクライアント権限で作品を取得するように変更
+    console.log('クライアント権限でユーザー作品を取得します');
+    const { data, error } = await supabase
+      .from('works')
+      .select('*')
+      .eq('user_id', userId);
     
-    let userWorks;
-    let userWorksError;
-    
-    // サービスロールキーがある場合は管理者権限で作品を取得
-    if (hasServiceRoleKey) {
-      console.log('管理者権限でユーザー作品を取得します');
-      const result = await fetchWorksWithAdmin(userId);
-      userWorks = result.data;
-      userWorksError = result.error;
-    } else {
-      // サービスロールキーがない場合は通常のクライアント権限で作品を取得
-      console.log('クライアント権限でユーザー作品を取得します');
-      const { data, error } = await supabase
-        .from('works')
-        .select('*')
-        .eq('user_id', userId);
-      
-      userWorks = data;
-      userWorksError = error;
-    }
-      
-    if (userWorksError) {
-      console.error('ユーザー作品の取得に失敗:', userWorksError);
-      return { success: false, error: 'ユーザー作品の取得に失敗しました' };
+    // 詳細なエラーログ
+    if (error) {
+      console.error('ユーザー作品の取得に失敗:', error);
+      console.error('エラー詳細:', JSON.stringify({
+        code: error.code,
+        message: error.message,
+        details: error.details,
+        hint: error.hint
+      }));
+      return { success: false, error: `ユーザー作品の取得に失敗しました: ${error.message}` };
     }
     
-    console.log(`ユーザー ${userId} の作品データ:`, userWorks);
+    console.log(`ユーザー ${userId} の作品データ:`, data);
     
     // 作品が見つからない場合はエラーを返す
-    if (!userWorks || userWorks.length === 0) {
+    if (!data || data.length === 0) {
       console.log('ユーザーの作品が見つかりません');
       return { success: false, error: 'ユーザーの作品が見つかりません。作品を追加してから再度お試しください。' };
     }
     
-    // 作品データを使用して分析を実行
-    return await analyzeUserTagsWithWorks(userWorks, userId);
+    // 作品データを使用して分析を実行 (クライアント権限での分析に変更)
+    return await analyzeUserWorksWithClientAuth(data, userId);
   } catch (error) {
     console.error('Error analyzing user tags:', error);
     return { success: false, error: 'タグ分析中にエラーが発生しました' };
@@ -176,172 +166,16 @@ export async function analyzeUserTagsApi(userId: string): Promise<UserInsightsRe
 }
 
 /**
- * ユーザーの分析結果を取得するAPI呼び出し
- * @param userId ユーザーID
- * @returns 分析結果
+ * クライアント権限での作品分析関数
+ * supabaseAdminの代わりにsupabaseクライアントを使用
  */
-export async function getUserInsightsApi(userId: string): Promise<UserInsightsResult> {
-  try {
-    console.log(`ユーザー ${userId} のインサイトを取得します...`);
-    
-    const { data, error } = await supabase
-      .from('user_insights')
-      .select('*')
-      .eq('user_id', userId)
-      .single();
-    
-    if (error) {
-      console.error('インサイト取得エラー:', error);
-      return {
-        success: false,
-        error: error.message
-      };
-    }
-    
-    if (!data) {
-      console.log('インサイトが見つかりません');
-      return {
-        success: false,
-        error: 'No insights found for this user'
-      };
-    }
-    
-    console.log('データベースから取得した生のインサイトデータ:', data);
-    
-    // データ形式の正規化 - 3つの主要指標を強調
-    const normalizedData = {
-      success: true,
-      data: {
-        // 1. 創造性と独自性 (オリジナリティ)
-        // 新しいアイデアや表現方法を生み出す能力
-        originality: {
-          summary: getSummary(data, 'originality', 'uniqueness', 
-            "独自の視点と表現スタイルを持っています。テーマや題材に対して新しいアプローチを取り入れ、既存の概念に独自の解釈を加えています。特に、日常的な題材を独自の視点で捉え直す能力が際立っています。")
-        },
-        // 2. 専門性とスキル (クオリティ)
-        // 作品の技術的完成度や専門的な深さ
-        quality: {
-          summary: getSummary(data, 'quality', 'talent',
-            "専門性とスキルが高く、信頼性のあるコンテンツを作成できます。文章の構成が論理的で、主張と根拠のバランスが取れています。情報の正確性と深さが読者に安心感を与え、専門知識を持つ読者からも評価される内容です。")
-        },
-        // 3. 影響力と共感 (エンゲージメント)
-        // 読者・視聴者との結びつきを作る能力
-        engagement: {
-          summary: getSummary(data, 'engagement', 'uniqueness',
-            "読者の共感を得やすい親しみやすい文体と、信頼性を感じさせる根拠に基づいた内容のバランスが取れています。感情に訴えかける表現と、知的好奇心を刺激する情報提供が効果的に組み合わされており、幅広い読者層に響く内容となっています。")
-        },
-        // サポート情報
-        expertise: {
-          summary: getSummary(data, 'expertise', '',
-            "データに基づいた分析と創造的な表現を組み合わせた独自のアプローチが特徴です。")
-        },
-        overall_insight: {
-          summary: getOverallSummary(data,
-            "これらの要素は相互に関連し合い、クリエイターとしての総合的な価値を形成しています。独自の視点と専門性の高さが作品の質を高め、読みやすい文体と共感を呼ぶ内容が読者との強い結びつきを生み出しています。特に、専門的な内容を親しみやすく伝える能力は、このクリエイターの最大の強みと言えるでしょう。"),
-          future_potential: getFuturePotential(data,
-            "今後は、さらに多様なテーマに挑戦することで表現の幅を広げ、より多くの読者層にアプローチできる可能性があります。また、視覚的要素や対話型コンテンツなど、異なるメディア形式との融合も検討すると、クリエイターとしての価値をさらに高められるでしょう。")
-        },
-        specialties: getArrayValue(data.specialties),
-        interests: {
-          areas: getArrayValue(data.interests?.areas || data.interests),
-          topics: getArrayValue(data.interests?.topics)
-        },
-        design_styles: getArrayValue(data.design_styles),
-        tag_frequency: typeof data.tag_frequency === 'object' && data.tag_frequency !== null
-          ? data.tag_frequency
-          : {}
-      }
-    };
-    
-    console.log('正規化したインサイトデータ:', normalizedData);
-    
-    return normalizedData;
-  } catch (error) {
-    console.error('インサイト取得中にエラーが発生しました:', error);
-    return {
-      success: false,
-      error: error instanceof Error ? error.message : '不明なエラーが発生しました'
-    };
-  }
-}
-
-/**
- * データからサマリー情報を取得するヘルパー関数
- * 複数のフィールド名に対応し、データの形式による分岐を統一
- */
-function getSummary(data: any, primaryField: string, alternativeField: string = '', defaultValue: string = ''): string {
-  // primaryFieldが存在する場合
-  if (data[primaryField]) {
-    if (typeof data[primaryField] === 'object' && data[primaryField] !== null) {
-      return data[primaryField].summary || defaultValue;
-    }
-    if (Array.isArray(data[primaryField])) {
-      return data[primaryField].join('\n');
-    }
-    if (typeof data[primaryField] === 'string') {
-      return data[primaryField];
-    }
-  }
-  
-  // alternativeFieldが存在し、指定されている場合
-  if (alternativeField && data[alternativeField]) {
-    if (typeof data[alternativeField] === 'object' && data[alternativeField] !== null) {
-      return data[alternativeField].summary || defaultValue;
-    }
-    if (Array.isArray(data[alternativeField])) {
-      return data[alternativeField].join('\n');
-    }
-    if (typeof data[alternativeField] === 'string') {
-      return data[alternativeField];
-    }
-  }
-  
-  return defaultValue;
-}
-
-/**
- * 全体的な洞察のサマリーを取得するヘルパー関数
- */
-function getOverallSummary(data: any, defaultValue: string): string {
-  if (typeof data.overall_insight === 'object' && data.overall_insight !== null) {
-    return data.overall_insight.summary || defaultValue;
-  }
-  return defaultValue;
-}
-
-/**
- * 将来の可能性に関する情報を取得するヘルパー関数
- */
-function getFuturePotential(data: any, defaultValue: string): string {
-  if (typeof data.overall_insight === 'object' && data.overall_insight !== null) {
-    return data.overall_insight.future_potential || defaultValue;
-  }
-  return defaultValue;
-}
-
-/**
- * 配列データを正規化するヘルパー関数
- */
-function getArrayValue(value: any): string[] {
-  if (Array.isArray(value)) {
-    return value;
-  }
-  if (typeof value === 'object' && value !== null) {
-    return Object.values(value);
-  }
-  return [];
-}
-
-/**
- * 作品データを使用して分析を行う関数
- */
-async function analyzeUserTagsWithWorks(userWorks: any[], userId: string) {
+async function analyzeUserWorksWithClientAuth(userWorks: any[], userId: string) {
   try {
     // 作品IDのリストを作成
     const workIds = userWorks.map((work: any) => work.id);
     
-    // 管理者権限で作品に関連するタグを取得
-    const { data: workTagsData, error: workTagsError } = await supabaseAdmin
+    // クライアント権限で作品に関連するタグを取得
+    const { data: workTagsData, error: workTagsError } = await supabase
       .from('work_tags')
       .select('tag_id, tags!inner(id, name, category)')
       .in('work_id', workIds);
@@ -419,12 +253,12 @@ async function analyzeUserTagsWithWorks(userWorks: any[], userId: string) {
       tag_frequency: tagFrequency
     };
     
-    // ユーザーインサイトをSupabaseに保存
+    // クライアント権限でユーザーインサイトをSupabaseに保存を試みる
     try {
-      const { error: saveError } = await supabaseAdmin
+      const { error: saveError } = await supabase
         .from('user_insights')
         .upsert({
-          user_id: userId, // userWorksからではなく直接userIdを使用
+          user_id: userId,
           originality: analysisResult.originality,
           quality: analysisResult.quality,
           expertise: analysisResult.expertise,
@@ -436,11 +270,12 @@ async function analyzeUserTagsWithWorks(userWorks: any[], userId: string) {
           tag_frequency: analysisResult.tag_frequency,
           updated_at: new Date().toISOString()
         }, {
-          onConflict: 'user_id'  // user_idカラムの一意制約に基づいてUPSERT
+          onConflict: 'user_id'
         });
         
       if (saveError) {
-        console.error('インサイトの保存に失敗:', saveError);
+        console.error('インサイト保存に失敗 (権限エラーの可能性):', saveError);
+        console.log('インサイトはローカルでのみ利用可能です');
       } else {
         console.log('分析インサイトをデータベースに保存しました');
       }
@@ -812,3 +647,182 @@ export const getPopularTags = async (
     return { success: false, error: 'Failed to get popular tags' };
   }
 };
+
+/**
+ * ユーザーの分析結果を取得するAPI呼び出し
+ * @param userId ユーザーID
+ * @returns 分析結果
+ */
+export async function getUserInsightsApi(userId: string): Promise<UserInsightsResult> {
+  try {
+    console.log(`ユーザー ${userId} のインサイトを取得します...`);
+    
+    // 環境変数のデバッグ情報
+    console.log('環境変数状態:');
+    console.log('環境モード:', import.meta.env.MODE);
+    console.log('VITE_SUPABASE_URL=', typeof import.meta.env.VITE_SUPABASE_URL, 
+      import.meta.env.VITE_SUPABASE_URL ? 'exists' : 'undefined');
+    console.log('VITE_SUPABASE_ANON_KEY=', typeof import.meta.env.VITE_SUPABASE_ANON_KEY,
+      import.meta.env.VITE_SUPABASE_ANON_KEY ? 'exists' : 'undefined');
+    
+    // クライアント権限でインサイトを取得
+    const { data, error } = await supabase
+      .from('user_insights')
+      .select('*')
+      .eq('user_id', userId)
+      .single();
+    
+    if (error) {
+      console.error('インサイト取得エラー:', error);
+      console.error('エラー詳細:', JSON.stringify({
+        code: error.code,
+        message: error.message,
+        details: error.details,
+        hint: error.hint
+      }));
+      
+      // インサイトが見つからない場合は分析を実行
+      if (error.code === 'PGRST116') {
+        console.log('インサイトが見つからないため、分析を実行します');
+        return await analyzeUserTagsApi(userId);
+      }
+      
+      return {
+        success: false,
+        error: error.message
+      };
+    }
+    
+    if (!data) {
+      console.log('インサイトが見つかりません');
+      return {
+        success: false,
+        error: 'No insights found for this user'
+      };
+    }
+    
+    console.log('データベースから取得した生のインサイトデータ:', data);
+    
+    // データ形式の正規化 - 3つの主要指標を強調
+    const normalizedData = {
+      success: true,
+      data: {
+        // 1. 創造性と独自性 (オリジナリティ)
+        // 新しいアイデアや表現方法を生み出す能力
+        originality: {
+          summary: getSummary(data, 'originality', 'uniqueness', 
+            "独自の視点と表現スタイルを持っています。テーマや題材に対して新しいアプローチを取り入れ、既存の概念に独自の解釈を加えています。特に、日常的な題材を独自の視点で捉え直す能力が際立っています。")
+        },
+        // 2. 専門性とスキル (クオリティ)
+        // 作品の技術的完成度や専門的な深さ
+        quality: {
+          summary: getSummary(data, 'quality', 'talent',
+            "専門性とスキルが高く、信頼性のあるコンテンツを作成できます。文章の構成が論理的で、主張と根拠のバランスが取れています。情報の正確性と深さが読者に安心感を与え、専門知識を持つ読者からも評価される内容です。")
+        },
+        // 3. 影響力と共感 (エンゲージメント)
+        // 読者・視聴者との結びつきを作る能力
+        engagement: {
+          summary: getSummary(data, 'engagement', 'uniqueness',
+            "読者の共感を得やすい親しみやすい文体と、信頼性を感じさせる根拠に基づいた内容のバランスが取れています。感情に訴えかける表現と、知的好奇心を刺激する情報提供が効果的に組み合わされており、幅広い読者層に響く内容となっています。")
+        },
+        // サポート情報
+        expertise: {
+          summary: getSummary(data, 'expertise', '',
+            "データに基づいた分析と創造的な表現を組み合わせた独自のアプローチが特徴です。")
+        },
+        overall_insight: {
+          summary: getOverallSummary(data,
+            "これらの要素は相互に関連し合い、クリエイターとしての総合的な価値を形成しています。独自の視点と専門性の高さが作品の質を高め、読みやすい文体と共感を呼ぶ内容が読者との強い結びつきを生み出しています。特に、専門的な内容を親しみやすく伝える能力は、このクリエイターの最大の強みと言えるでしょう。"),
+          future_potential: getFuturePotential(data,
+            "今後は、さらに多様なテーマに挑戦することで表現の幅を広げ、より多くの読者層にアプローチできる可能性があります。また、視覚的要素や対話型コンテンツなど、異なるメディア形式との融合も検討すると、クリエイターとしての価値をさらに高められるでしょう。")
+        },
+        specialties: getArrayValue(data.specialties),
+        interests: {
+          areas: getArrayValue(data.interests?.areas || data.interests),
+          topics: getArrayValue(data.interests?.topics)
+        },
+        design_styles: getArrayValue(data.design_styles),
+        tag_frequency: typeof data.tag_frequency === 'object' && data.tag_frequency !== null
+          ? data.tag_frequency
+          : {}
+      }
+    };
+    
+    console.log('正規化したインサイトデータ:', normalizedData);
+    
+    return normalizedData;
+  } catch (error) {
+    console.error('インサイト取得中にエラーが発生しました:', error);
+    return {
+      success: false,
+      error: error instanceof Error ? error.message : '不明なエラーが発生しました'
+    };
+  }
+}
+
+/**
+ * データからサマリー情報を取得するヘルパー関数
+ * 複数のフィールド名に対応し、データの形式による分岐を統一
+ */
+function getSummary(data: any, primaryField: string, alternativeField: string = '', defaultValue: string = ''): string {
+  // primaryFieldが存在する場合
+  if (data[primaryField]) {
+    if (typeof data[primaryField] === 'object' && data[primaryField] !== null) {
+      return data[primaryField].summary || defaultValue;
+    }
+    if (Array.isArray(data[primaryField])) {
+      return data[primaryField].join('\n');
+    }
+    if (typeof data[primaryField] === 'string') {
+      return data[primaryField];
+    }
+  }
+  
+  // alternativeFieldが存在し、指定されている場合
+  if (alternativeField && data[alternativeField]) {
+    if (typeof data[alternativeField] === 'object' && data[alternativeField] !== null) {
+      return data[alternativeField].summary || defaultValue;
+    }
+    if (Array.isArray(data[alternativeField])) {
+      return data[alternativeField].join('\n');
+    }
+    if (typeof data[alternativeField] === 'string') {
+      return data[alternativeField];
+    }
+  }
+  
+  return defaultValue;
+}
+
+/**
+ * 全体的な洞察のサマリーを取得するヘルパー関数
+ */
+function getOverallSummary(data: any, defaultValue: string): string {
+  if (typeof data.overall_insight === 'object' && data.overall_insight !== null) {
+    return data.overall_insight.summary || defaultValue;
+  }
+  return defaultValue;
+}
+
+/**
+ * 将来の可能性に関する情報を取得するヘルパー関数
+ */
+function getFuturePotential(data: any, defaultValue: string): string {
+  if (typeof data.overall_insight === 'object' && data.overall_insight !== null) {
+    return data.overall_insight.future_potential || defaultValue;
+  }
+  return defaultValue;
+}
+
+/**
+ * 配列データを正規化するヘルパー関数
+ */
+function getArrayValue(value: any): string[] {
+  if (Array.isArray(value)) {
+    return value;
+  }
+  if (typeof value === 'object' && value !== null) {
+    return Object.values(value);
+  }
+  return [];
+}
