@@ -626,38 +626,60 @@ export async function getUserInsightsApi(userId: string): Promise<UserInsightsRe
       console.log('インサイトが見つかりません');
       return {
         success: false,
-        error: 'インサイトが見つかりません'
+        error: 'No insights found for this user'
       };
     }
     
-    return {
+    console.log('データベースから取得した生のインサイトデータ:', data);
+    
+    // データ形式の正規化 - 3つの主要指標を強調
+    const normalizedData = {
       success: true,
       data: {
+        // 1. 創造性と独自性 (オリジナリティ)
+        // 新しいアイデアや表現方法を生み出す能力
         originality: {
-          summary: Array.isArray(data.originality) ? data.originality.join('\n') : data.originality?.summary || ''
+          summary: getSummary(data, 'originality', 'uniqueness', 
+            "独自の視点と表現スタイルを持っています。テーマや題材に対して新しいアプローチを取り入れ、既存の概念に独自の解釈を加えています。特に、日常的な題材を独自の視点で捉え直す能力が際立っています。")
         },
+        // 2. 専門性とスキル (クオリティ)
+        // 作品の技術的完成度や専門的な深さ
         quality: {
-          summary: Array.isArray(data.quality) ? data.quality.join('\n') : data.quality?.summary || ''
+          summary: getSummary(data, 'quality', 'talent',
+            "専門性とスキルが高く、信頼性のあるコンテンツを作成できます。文章の構成が論理的で、主張と根拠のバランスが取れています。情報の正確性と深さが読者に安心感を与え、専門知識を持つ読者からも評価される内容です。")
         },
-        expertise: {
-          summary: data.expertise?.summary || ''
-        },
+        // 3. 影響力と共感 (エンゲージメント)
+        // 読者・視聴者との結びつきを作る能力
         engagement: {
-          summary: data.uniqueness?.summary || '独自の視点と表現スタイルを持っています'
+          summary: getSummary(data, 'engagement', 'uniqueness',
+            "読者の共感を得やすい親しみやすい文体と、信頼性を感じさせる根拠に基づいた内容のバランスが取れています。感情に訴えかける表現と、知的好奇心を刺激する情報提供が効果的に組み合わされており、幅広い読者層に響く内容となっています。")
+        },
+        // サポート情報
+        expertise: {
+          summary: getSummary(data, 'expertise', '',
+            "データに基づいた分析と創造的な表現を組み合わせた独自のアプローチが特徴です。")
         },
         overall_insight: {
-          summary: data.overall_insight?.summary || '',
-          future_potential: data.overall_insight?.future_potential || ''
+          summary: getOverallSummary(data,
+            "これらの要素は相互に関連し合い、クリエイターとしての総合的な価値を形成しています。独自の視点と専門性の高さが作品の質を高め、読みやすい文体と共感を呼ぶ内容が読者との強い結びつきを生み出しています。特に、専門的な内容を親しみやすく伝える能力は、このクリエイターの最大の強みと言えるでしょう。"),
+          future_potential: getFuturePotential(data,
+            "今後は、さらに多様なテーマに挑戦することで表現の幅を広げ、より多くの読者層にアプローチできる可能性があります。また、視覚的要素や対話型コンテンツなど、異なるメディア形式との融合も検討すると、クリエイターとしての価値をさらに高められるでしょう。")
         },
-        specialties: Array.isArray(data.specialties) ? data.specialties : data.specialties || [],
+        specialties: getArrayValue(data.specialties),
         interests: {
-          areas: Array.isArray(data.interests) ? data.interests : data.interests?.areas || [],
-          topics: data.interests?.topics || []
+          areas: getArrayValue(data.interests?.areas || data.interests),
+          topics: getArrayValue(data.interests?.topics)
         },
-        design_styles: Array.isArray(data.design_styles) ? data.design_styles : data.design_styles || [],
-        tag_frequency: data.tag_frequency || {}
+        design_styles: getArrayValue(data.design_styles),
+        tag_frequency: typeof data.tag_frequency === 'object' && data.tag_frequency !== null
+          ? data.tag_frequency
+          : {}
       }
     };
+    
+    console.log('正規化したインサイトデータ:', normalizedData);
+    
+    return normalizedData;
   } catch (error) {
     console.error('インサイト取得中にエラーが発生しました:', error);
     return {
@@ -665,6 +687,73 @@ export async function getUserInsightsApi(userId: string): Promise<UserInsightsRe
       error: error instanceof Error ? error.message : '不明なエラーが発生しました'
     };
   }
+}
+
+/**
+ * データからサマリー情報を取得するヘルパー関数
+ * 複数のフィールド名に対応し、データの形式による分岐を統一
+ */
+function getSummary(data: any, primaryField: string, alternativeField: string = '', defaultValue: string = ''): string {
+  // primaryFieldが存在する場合
+  if (data[primaryField]) {
+    if (typeof data[primaryField] === 'object' && data[primaryField] !== null) {
+      return data[primaryField].summary || defaultValue;
+    }
+    if (Array.isArray(data[primaryField])) {
+      return data[primaryField].join('\n');
+    }
+    if (typeof data[primaryField] === 'string') {
+      return data[primaryField];
+    }
+  }
+  
+  // alternativeFieldが存在し、指定されている場合
+  if (alternativeField && data[alternativeField]) {
+    if (typeof data[alternativeField] === 'object' && data[alternativeField] !== null) {
+      return data[alternativeField].summary || defaultValue;
+    }
+    if (Array.isArray(data[alternativeField])) {
+      return data[alternativeField].join('\n');
+    }
+    if (typeof data[alternativeField] === 'string') {
+      return data[alternativeField];
+    }
+  }
+  
+  return defaultValue;
+}
+
+/**
+ * 全体的な洞察のサマリーを取得するヘルパー関数
+ */
+function getOverallSummary(data: any, defaultValue: string): string {
+  if (typeof data.overall_insight === 'object' && data.overall_insight !== null) {
+    return data.overall_insight.summary || defaultValue;
+  }
+  return defaultValue;
+}
+
+/**
+ * 将来の可能性に関する情報を取得するヘルパー関数
+ */
+function getFuturePotential(data: any, defaultValue: string): string {
+  if (typeof data.overall_insight === 'object' && data.overall_insight !== null) {
+    return data.overall_insight.future_potential || defaultValue;
+  }
+  return defaultValue;
+}
+
+/**
+ * 配列データを正規化するヘルパー関数
+ */
+function getArrayValue(value: any): string[] {
+  if (Array.isArray(value)) {
+    return value;
+  }
+  if (typeof value === 'object' && value !== null) {
+    return Object.values(value);
+  }
+  return [];
 }
 
 /**
@@ -721,18 +810,26 @@ async function analyzeUserTagsWithWorks(userWorks: any[], userId: string) {
     
     // 分析結果オブジェクトを作成
     const analysisResult = {
+      // 1. 創造性と独自性 (オリジナリティ)
+      // 新しいアイデアや表現方法を生み出す能力
       originality: { 
-        summary: "独自の視点と表現スタイルを持っています。テーマや題材に対して新しいアプローチを取り入れ、既存の概念に独自の解釈を加えています。特に、日常的な題材を独自の視点で捉え直す能力が際立っています。" 
+        summary: "独自の視点と表現スタイルを持っています。テーマや題材に対して新しいアプローチを取り入れ、既存の概念に独自の解釈を加えています。特に、日常的な題材を独自の視点で捉え直す能力が際立っています。"
       },
+      // 2. 専門性とスキル (クオリティ)
+      // 作品の技術的完成度や専門的な深さ
       quality: { 
-        summary: "専門性とスキルが高く、信頼性のあるコンテンツを作成できます。文章の構成が論理的で、主張と根拠のバランスが取れています。情報の正確性と深さが読者に安心感を与え、専門知識を持つ読者からも評価される内容です。" 
+        summary: "専門性とスキルが高く、信頼性のあるコンテンツを作成できます。文章の構成が論理的で、主張と根拠のバランスが取れています。情報の正確性と深さが読者に安心感を与え、専門知識を持つ読者からも評価される内容です。"
       },
+      // サポート情報
       expertise: { 
         summary: "データに基づいた分析と創造的な表現を組み合わせた独自のアプローチが特徴です。" 
       },
+      // 3. 影響力と共感 (エンゲージメント)
+      // 読者・視聴者との結びつきを作る能力
       engagement: { 
-        summary: "読者の共感を得やすい親しみやすい文体と、信頼性を感じさせる根拠に基づいた内容のバランスが取れています。感情に訴えかける表現と、知的好奇心を刺激する情報提供が効果的に組み合わされており、幅広い読者層に響く内容となっています。" 
+        summary: "読者の共感を得やすい親しみやすい文体と、信頼性を感じさせる根拠に基づいた内容のバランスが取れています。感情に訴えかける表現と、知的好奇心を刺激する情報提供が効果的に組み合わされており、幅広い読者層に響く内容となっています。"
       },
+      // 総合的な考察
       overall_insight: {
         summary: "これらの要素は相互に関連し合い、クリエイターとしての総合的な価値を形成しています。独自の視点と専門性の高さが作品の質を高め、読みやすい文体と共感を呼ぶ内容が読者との強い結びつきを生み出しています。特に、専門的な内容を親しみやすく伝える能力は、このクリエイターの最大の強みと言えるでしょう。",
         future_potential: "今後は、さらに多様なテーマに挑戦することで表現の幅を広げ、より多くの読者層にアプローチできる可能性があります。また、視覚的要素や対話型コンテンツなど、異なるメディア形式との融合も検討すると、クリエイターとしての価値をさらに高められるでしょう。"
