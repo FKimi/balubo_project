@@ -24,7 +24,6 @@ import {
   EyeIcon,
   MoreHorizontalIcon,
   CameraIcon,
-  LockClosedIcon,
   ThumbsUpIcon,
   ThumbsDownIcon,
   InfoIcon
@@ -43,12 +42,6 @@ import { getUserInsightsApi, UserInsightsResult } from '../../api/tag-analysis-a
 import { analyzeUserTagsDirectly } from '../../lib/tag-analysis';
 // 型定義をインポート
 import { UserProfile, Work, Career, AIAnalysisResult } from '../../types';
-import { Button } from "@/components/ui/button";
-import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
-import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
-import { toast } from "@/components/ui/use-toast";
-import { getUserInsightsApi } from "@/api/tag-analysis-api";
-import { UserInsightsResult } from "@/api/tag-analysis-api";
 import { Loader2 as Spinner } from "lucide-react";
 
 const MONTHS = [
