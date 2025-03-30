@@ -2,6 +2,29 @@ import React, { useState, useEffect } from 'react';
 import { supabase, resetAuthState } from '../../lib/supabase';
 import { ArrowLeft, AlertTriangle } from 'lucide-react';
 import { useNavigate, useLocation } from 'react-router-dom';
+import { useToast } from '../../lib/hooks/useToast';
+
+// Google認証中のスタイルを追加
+const googleAuthStyles = `
+  .google-auth-in-progress:before {
+    content: "Google認証を処理中です...";
+    position: fixed;
+    top: 0;
+    left: 0;
+    right: 0;
+    background-color: #4285F4;
+    color: white;
+    text-align: center;
+    padding: 8px;
+    z-index: 9999;
+    font-size: 14px;
+  }
+  
+  .google-auth-in-progress .auth-container {
+    opacity: 0.6;
+    pointer-events: none;
+  }
+`;
 
 export function LoginForm() {
   const [email, setEmail] = useState('');
@@ -12,6 +35,7 @@ export function LoginForm() {
   const [authReset, setAuthReset] = useState(false);
   const navigate = useNavigate();
   const location = useLocation();
+  const toast = useToast();
 
   // URLパラメータからエラー情報を取得
   useEffect(() => {
@@ -33,6 +57,27 @@ export function LoginForm() {
       handleAuthReset();
     }
   }, [location]);
+
+  // コンポーネントがマウントされたときに、前回の認証プロセスが中断された場合のクリーンアップ
+  useEffect(() => {
+    // スタイルの注入
+    const styleElement = document.createElement('style');
+    styleElement.innerHTML = googleAuthStyles;
+    document.head.appendChild(styleElement);
+    
+    // クリーンアップ: 前回のGoogleログイン進行中フラグが残っていればクリア
+    const isGoogleAuthInProgress = localStorage.getItem('google_auth_in_progress') === 'true';
+    if (isGoogleAuthInProgress) {
+      console.log('ℹ️ 未完了のGoogleログインプロセスをクリーンアップします');
+      localStorage.removeItem('google_auth_in_progress');
+      document.body.classList.remove('google-auth-in-progress');
+    }
+    
+    return () => {
+      // コンポーネントのアンマウント時にスタイルを削除
+      document.head.removeChild(styleElement);
+    };
+  }, []);
 
   // 認証状態のリセットを行う関数
   const handleAuthReset = async () => {
@@ -96,40 +141,54 @@ export function LoginForm() {
     }
   };
 
+  // Googleログインを処理する関数
   const handleGoogleSignIn = async () => {
-    setGoogleLoading(true);
-    setError(null);
-    
     try {
-      // Google認証前に現在の認証状態をリセット（オプション）
-      if (authReset) {
-        await resetAuthState();
-      }
+      // トースト通知を追加
+      toast({
+        title: "Googleログインを開始します",
+      });
+      
+      // リダイレクト先をlocalStorageに保存
+      localStorage.setItem('redirect_after_login', '/mypage');
+      console.log('📍 ログイン後のリダイレクト先を設定:', '/mypage');
+      
+      // Googleログイン処理
+      setGoogleLoading(true);
       
       const { error } = await supabase.auth.signInWithOAuth({
         provider: 'google',
         options: {
-          redirectTo: `${window.location.origin}/auth/callback`,
-        },
+          redirectTo: `${window.location.origin}/callback`,
+          queryParams: {
+            access_type: 'offline',
+            prompt: 'consent'
+          }
+        }
       });
-      
-      if (error) throw error;
-      
-      // Google認証はリダイレクトするため、ここではnavigateは不要
-    } catch (err) {
-      let errorMessage = 'Googleログイン中にエラーが発生しました';
-      
-      if (err instanceof Error) {
-        errorMessage = err.message;
+
+      if (error) {
+        console.error('🔴 Googleログインエラー:', error.message);
+        toast.error({
+          title: "ログインに失敗しました",
+          description: error.message
+        });
+        localStorage.removeItem('redirect_after_login');
       }
-      
-      setError(errorMessage);
+    } catch (error) {
+      console.error('🔴 予期せぬエラー:', error);
+      toast.error({
+        title: "予期せぬエラーが発生しました",
+        description: error instanceof Error ? error.message : '不明なエラー'
+      });
+      localStorage.removeItem('redirect_after_login');
+    } finally {
       setGoogleLoading(false);
     }
   };
 
   return (
-    <div className="min-h-screen bg-gray-50 flex flex-col justify-center py-12 sm:px-6 lg:px-8">
+    <div className="min-h-screen bg-gray-50 flex flex-col justify-center py-12 sm:px-6 lg:px-8 auth-container">
       <div className="sm:mx-auto sm:w-full sm:max-w-md">
         <button
           onClick={() => navigate('/')}
@@ -154,12 +213,24 @@ export function LoginForm() {
 
       <div className="mt-8 sm:mx-auto sm:w-full sm:max-w-md">
         <div className="bg-white py-8 px-4 shadow sm:rounded-lg sm:px-10">
-          {authReset && (
+          {/* 認証リセット中のメッセージ - Google認証進行中は表示しない */}
+          {authReset && !localStorage.getItem('google_auth_in_progress') && (
             <div className="mb-4 p-3 bg-blue-50 rounded-md border border-blue-100 flex items-start">
               <AlertTriangle className="w-5 h-5 text-blue-500 mr-2 mt-0.5" />
               <div>
                 <p className="text-sm text-blue-700">認証状態をリセットしています...</p>
                 <p className="text-xs text-blue-600 mt-1">前回のセッションで問題が発生したため、安全のためにログイン状態がリセットされました。</p>
+              </div>
+            </div>
+          )}
+          
+          {/* Googleログイン進行中の明確なインジケーター */}
+          {localStorage.getItem('google_auth_in_progress') === 'true' && (
+            <div className="mb-4 p-3 bg-green-50 rounded-md border border-green-100 flex items-start">
+              <div className="animate-spin rounded-full h-5 w-5 border-b-2 border-green-500 mr-2 mt-0.5"></div>
+              <div>
+                <p className="text-sm text-green-700">Google認証を処理中...</p>
+                <p className="text-xs text-green-600 mt-1">ブラウザのポップアップに従って認証を完了してください。このページは自動的にリダイレクトされます。</p>
               </div>
             </div>
           )}

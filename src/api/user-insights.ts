@@ -102,11 +102,11 @@ export async function saveUserInsights(
  */
 export async function getUserInsightsApi(
   userId: string
-): Promise<{ 
-  success: boolean; 
-  data?: { 
-    originality?: InsightItem; 
-    quality?: InsightItem; 
+): Promise<{
+  success: boolean;
+  data?: {
+    originality?: InsightItem;
+    quality?: InsightItem;
     expertise?: InsightItem;
     engagement?: InsightItem;
     overall_insight?: {
@@ -119,45 +119,53 @@ export async function getUserInsightsApi(
       name: string;
       tags: string[];
     }>;
-  }; 
-  error?: string 
+  };
+  error?: string;
 }> {
   try {
     console.log('Fetching user insights for user:', userId);
-    
-    // ユーザーインサイトを取得
+
     const { data, error } = await supabase
       .from('user_insights')
       .select('*')
       .eq('user_id', userId)
-      .maybeSingle();
-    
+      .maybeSingle(); // 0行または1行を取得
+
+    // Supabase の予期せぬエラー処理
     if (error) {
+      // PGRST116 (行が見つからない) エラーは無視し、データなしとして扱う
+      // SupabaseError 型をインポートする必要があるかもしれないが、まずは code プロパティで判定
+      // @ts-ignore // 型エラーを一時的に無視
+      if (error.code === 'PGRST116') {
+          console.log('No insights found for user (PGRST116):', userId);
+          // データが存在しない場合は、エラーではなく成功として扱い、データが空であることを示す
+          return { success: true, data: undefined };
+      }
+      // その他の DB エラー
       console.error('Error fetching user insights:', error);
       return { success: false, error: error.message };
     }
-    
+
+    // データが存在しない場合の処理 (maybeSingle で data が null になる)
     if (!data) {
-      console.log('No insights found for user:', userId);
-      return { 
-        success: false, 
-        error: 'No insights found for this user' 
-      };
+      console.log('No insights found for user (data is null):', userId);
+      // データが存在しない場合は、エラーではなく成功として扱い、データが空であることを示す
+      return { success: true, data: undefined };
     }
-    
+
     console.log('User insights fetched successfully:', data);
-    
-    // データを整形して返す
-    return { 
-      success: true, 
+
+    // データを整形して返す (既存のロジックを維持しつつ、null チェックを追加)
+    return {
+      success: true,
       data: {
         originality: data.originality || { summary: '' },
         quality: data.quality || { summary: '' },
         expertise: data.expertise || { summary: '' },
         engagement: data.engagement || { summary: '' },
         overall_insight: data.overall_insight || {
-          summary: 'これらの要素は相互に関連し合い、クリエイターとしての総合的な価値を形成しています。一つの要素が他の要素を強化し、全体として独自の魅力を生み出しています。あなたの作品は、専門性と創造性のバランスが取れており、読者に新たな視点や価値を提供しています。',
-          future_potential: 'あなたの創造性と情熱は、今後さらに多くの可能性を広げていくでしょう。新たな挑戦や異なる分野との融合を通じて、クリエイターとしての価値をさらに高めていくことができます。自分の強みを活かしながら、好奇心を持って探求を続けることが、長期的な成長につながります。'
+          summary: '分析データがまだありません。', // デフォルト値を設定
+          future_potential: '作品を追加すると分析が開始されます。' // デフォルト値を設定
         },
         specialties: data.specialties || [],
         design_styles: data.design_styles || [],
@@ -166,9 +174,9 @@ export async function getUserInsightsApi(
     };
   } catch (error) {
     console.error('Error in getUserInsightsApi:', error);
-    return { 
-      success: false, 
-      error: error instanceof Error ? error.message : String(error) 
+    return {
+      success: false,
+      error: error instanceof Error ? error.message : String(error)
     };
   }
 }

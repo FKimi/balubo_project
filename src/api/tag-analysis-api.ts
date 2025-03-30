@@ -1,5 +1,4 @@
 import { supabase } from '../lib/supabase';
-import { supabaseAdmin, fetchWorksWithAdmin } from '../lib/supabase-admin';
 import { analyzeUserTagsDirectly } from '../lib/tag-analysis';
 
 // 分析結果の型定義
@@ -316,14 +315,14 @@ async function analyzeUserWorksWithClientAuth(userWorks: any[], userId: string) 
       ["ミニマリスト", "モダン", "クリーン", "機能的"];
     
     // 作品の分析から得られた洞察に基づいて動的コメントを生成
-    const generateDynamicComment = (tags: string[], specialtyTags: string[]) => {
+    const generateDynamicComment = (_tags: string[], specialtyTags: string[]) => {
       // トップタグに基づいて特性を判断
       const topTags = specialtyTags.slice(0, 3);
       const allTagsText = topTags.join('、');
       
       // タグの数に基づく特性
-      const tagDiversity = allTags.length > 10 ? '多様な' : '特定の';
-      const focusLevel = allTags.length < 8 ? '専門的で深い' : '幅広い';
+      const tagDiversity = _tags.length > 10 ? '多様な' : '特定の';
+      const focusLevel = _tags.length < 8 ? '専門的で深い' : '幅広い';
       
       // タグの種類から特性を判断
       const isTechnical = topTags.some(tag => 
@@ -843,149 +842,122 @@ export const getPopularTags = async (
  * @returns 分析結果
  */
 export async function getUserInsightsApi(userId: string): Promise<UserInsightsResult> {
+  console.log(`ユーザー ${userId} のインサイトを取得します...`);
+  
+  // 将来の可能性に関するコメントを生成するヘルパー関数 (スコープ内に移動)
+  const generateFuturePotential = (data: any) => {
+    const specialties = getArrayValue(data?.specialties || []); // dataがnullの場合を考慮
+    const topSpecialties = specialties.slice(0, 3);
+    
+    // 特定のキーワードに基づいて異なるコメントを生成
+    const isCreative = topSpecialties.some(tag => 
+      ['デザイン', 'クリエイティブ', 'アート', '創作', '表現'].some(term => 
+        tag?.toLowerCase().includes(term) // tagがundefinedの可能性を考慮
+      )
+    );
+    
+    const isTechnical = topSpecialties.some(tag => 
+      ['プログラミング', 'コーディング', '開発', 'エンジニアリング', 'テクニカル'].some(term => 
+        tag?.toLowerCase().includes(term) // tagがundefinedの可能性を考慮
+      )
+    );
+    
+    const isAnalytical = topSpecialties.some(tag => 
+      ['分析', 'データ', '調査', 'リサーチ', '評価'].some(term => 
+        tag?.toLowerCase().includes(term) // tagがundefinedの可能性を考慮
+      )
+    );
+    
+    // ベースとなるコメント
+    let futurePotential = '今後、異なる分野の知識を組み合わせることで、さらに独自性を高める可能性があります。';
+    
+    // 特性に基づいた追加コメント
+    if (isCreative) {
+      futurePotential += '新たな表現技法や媒体の探究が魅力をさらに高めるでしょう。多様な創作活動を通じて、より幅広いオーディエンスに届けられる可能性があります。';
+    } else if (isTechnical) {
+      futurePotential += '新しい技術やフレームワークの習得により、さらに可能性が広がるでしょう。技術の深化とともに、より複雑な課題に取り組める専門性を高められます。';
+    } else if (isAnalytical) {
+      futurePotential += 'より高度な分析手法の導入により、さらに深い洞察を提供できるようになるでしょう。データの関連性を見出す能力は、様々な分野で価値を生み出します。';
+    } else {
+      futurePotential += '新たな表現方法の探求も魅力を高めます。自分の強みを活かしながら、好奇心を持って探求を続けることが、長期的な成長につながります。';
+    }
+    
+    return futurePotential;
+  };
+
   try {
-    console.log(`ユーザー ${userId} のインサイトを取得します...`);
-    
-    // 環境変数のデバッグ情報
-    console.log('環境変数状態:');
-    console.log('環境モード:', import.meta.env.MODE);
-    console.log('VITE_SUPABASE_URL=', typeof import.meta.env.VITE_SUPABASE_URL, 
-      import.meta.env.VITE_SUPABASE_URL ? 'exists' : 'undefined');
-    console.log('VITE_SUPABASE_ANON_KEY=', typeof import.meta.env.VITE_SUPABASE_ANON_KEY,
-      import.meta.env.VITE_SUPABASE_ANON_KEY ? 'exists' : 'undefined');
-    
-    // クライアント権限でインサイトを取得
     const { data, error } = await supabase
       .from('user_insights')
       .select('*')
       .eq('user_id', userId)
-      .single();
-    
+      .maybeSingle(); // .single() から .maybeSingle() に変更
+
+    // maybeSingle でも他のエラーは発生しうるのでエラーチェックは残す
     if (error) {
-      console.error('インサイト取得エラー:', error);
-      console.error('エラー詳細:', JSON.stringify({
-        code: error.code,
-        message: error.message,
-        details: error.details,
-        hint: error.hint
-      }));
-      
-      // インサイトが見つからない場合は分析を実行
-      if (error.code === 'PGRST116') {
-        console.log('インサイトが見つからないため、分析を実行します');
-        return await analyzeUserTagsApi(userId);
-      }
-      
-      return {
-        success: false,
-        error: error.message
-      };
+      // PGRST116 は発生しなくなるが、他のDBエラー等の可能性は残る
+      console.error(`インサイトの取得に失敗しました (${userId}):`, error);
+      console.error('エラー詳細:', JSON.stringify(error));
+      // エラーメッセージは具体的なDBエラーを返すように修正
+      return { success: false, error: `インサイトのデータベースアクセスに失敗しました: ${error.message}` };
     }
-    
-    if (!data) {
-      console.log('インサイトが見つかりません');
-      return {
-        success: false,
-        error: 'No insights found for this user'
+
+    console.log(`ユーザー ${userId} の取得したインサイトデータ:`, data);
+
+    // データが存在する場合 (data が null でない場合)
+    if (data) {
+      // interests の整形（古いデータ形式への対応）
+      let interests = data.interests || { areas: [], topics: [] };
+      if (!interests.areas && !interests.topics && Array.isArray(data.interests)) {
+          // 古い形式（単なる配列）の場合、specialties から生成するロジックを適用
+          const specialties = data.specialties || [];
+          interests = {
+              areas: specialties.slice(0, 3) || [],
+              topics: specialties.slice(3, 6) || []
+          };
+          console.log(`古い形式のinterestsデータを整形しました: `, interests);
+      }
+
+      // specialties, design_styles が null の場合に空配列にする
+      const specialties = data.specialties || [];
+      const design_styles = data.design_styles || [];
+
+      // 未来の可能性を動的に生成 (ヘルパー関数を使用)
+      const futurePotential = data.overall_insight?.future_potential || generateFuturePotential(data);
+
+      // 必要なフィールドが存在するか確認し、なければデフォルト値を設定
+      const overallInsightSummary = getOverallSummary(data, '分析データがまだありません。');
+      const overallInsight = {
+          summary: overallInsightSummary,
+          future_potential: futurePotential || '作品を追加すると分析が開始されます。'
       };
+
+      const responseData = {
+          ...data,
+          originality: { summary: getSummary(data, 'originality', '', '不明') },
+          quality: { summary: getSummary(data, 'quality', '', '不明') },
+          expertise: { summary: getSummary(data, 'expertise', '', '不明') },
+          engagement: { summary: getSummary(data, 'engagement', '', '不明') },
+          overall_insight: overallInsight,
+          specialties: getArrayValue(specialties),
+          interests: interests, // 整形済みのinterestsを使用
+          design_styles: getArrayValue(design_styles),
+          tag_frequency: data.tag_frequency || undefined
+      };
+
+      return { success: true, data: responseData };
+    } else {
+        // data が null の場合 (インサイトデータが存在しない場合)
+        console.log(`ユーザー ${userId} のインサイトデータが見つかりませんでした (data is null)。`);
+        // フロントエンドは data: undefined を期待しているため、そのまま返す
+        return { success: true, data: undefined };
     }
-    
-    console.log('データベースから取得した生のインサイトデータ:', data);
-    
-    // 将来の可能性に関するコメントを生成するヘルパー関数
-    const generateFuturePotential = (data: any) => {
-      const specialties = getArrayValue(data.specialties);
-      const topSpecialties = specialties.slice(0, 3);
-      
-      // 特定のキーワードに基づいて異なるコメントを生成
-      const isCreative = topSpecialties.some(tag => 
-        ['デザイン', 'クリエイティブ', 'アート', '創作', '表現'].some(term => 
-          tag.toLowerCase().includes(term)
-        )
-      );
-      
-      const isTechnical = topSpecialties.some(tag => 
-        ['プログラミング', 'コーディング', '開発', 'エンジニアリング', 'テクニカル'].some(term => 
-          tag.toLowerCase().includes(term)
-        )
-      );
-      
-      const isAnalytical = topSpecialties.some(tag => 
-        ['分析', 'データ', '調査', 'リサーチ', '評価'].some(term => 
-          tag.toLowerCase().includes(term)
-        )
-      );
-      
-      // ベースとなるコメント
-      let futurePotential = '今後、異なる分野の知識を組み合わせることで、さらに独自性を高める可能性があります。';
-      
-      // 特性に基づいた追加コメント
-      if (isCreative) {
-        futurePotential += '新たな表現技法や媒体の探究が魅力をさらに高めるでしょう。多様な創作活動を通じて、より幅広いオーディエンスに届けられる可能性があります。';
-      } else if (isTechnical) {
-        futurePotential += '新しい技術やフレームワークの習得により、さらに可能性が広がるでしょう。技術の深化とともに、より複雑な課題に取り組める専門性を高められます。';
-      } else if (isAnalytical) {
-        futurePotential += 'より高度な分析手法の導入により、さらに深い洞察を提供できるようになるでしょう。データの関連性を見出す能力は、様々な分野で価値を生み出します。';
-      } else {
-        futurePotential += '新たな表現方法の探求も魅力を高めます。自分の強みを活かしながら、好奇心を持って探求を続けることが、長期的な成長につながります。';
-      }
-      
-      return futurePotential;
-    };
-    
-    // データ形式の正規化 - 3つの主要指標を強調
-    const normalizedData = {
-      success: true,
-      data: {
-        // 1. 創造性と独自性 (オリジナリティ)
-        // 新しいアイデアや表現方法を生み出す能力
-        originality: {
-          summary: getSummary(data, 'originality', 'uniqueness', 
-            "あなたの作品からは、他者には見られない独自の視点と創造的な思考が輝いています。特に子犬や動物に関する深い知見と愛情が、作品全体に温かみと親しみやすさをもたらしています。既存の概念を新たな角度から捉え直す能力と、それを表現するオリジナルな手法は、あなただけの魅力として作品に反映されています。日常の何気ない瞬間に特別な意味を見出し、視聴者がこれまで気づかなかった視点を提供する才能は、あなたならではの価値です。\n\nこの創造性と独自性は、あなたの知的好奇心と探究心、そして対象への深い愛情に支えられており、一般的な思考の枠を超えて新たな価値を生み出しています。他者の模倣ではなく、自分だけの表現を追求する姿勢が、あなたの作品にかけがえのない独自性をもたらしています。動物の行動や感情を繊細に捉え、人間との関係性に新たな光を当てるこの視点は、今後さらに深められることで、より広い層の人々の心に響く可能性を秘めています。")
-        },
-        // 2. 専門性とスキル (クオリティ)
-        // 作品の技術的完成度や専門的な深さ
-        quality: {
-          summary: getSummary(data, 'quality', 'talent',
-            "あなたの作品には高い専門性と洗練されたスキルが随所に表れています。動物や子犬の行動や心理についての深い理解が、作品に説得力と信頼性をもたらしています。複雑な感情や関係性を正確かつ分かりやすく伝える能力は特筆すべきもので、生物の本質を捉えた観察と温かい視点が見事に調和しています。\n\n技術的な正確さと創造的な表現のバランスが優れており、それぞれの作品に一貫した質の高さが感じられます。特に、細部への丁寧な配慮と全体の構成バランスの取れた完成度は、長年の経験と継続的な学びから培われたものでしょう。動物と人間の相互関係や感情交流の機微を捉える感性は、単なる表面的な観察ではなく、深い共感と理解に基づいています。\n\nこの専門性の高さは、単なる技術的なスキルだけでなく、対象への深い理解と敬意、そして真摯な探究姿勢から生まれています。あなたの作品は情報の正確さと創造的な表現の両面で信頼性が高く、読者や視聴者に確かな価値と新たな気づきを提供しています。")
-        },
-        // 3. 影響力と共感 (エンゲージメント)
-        // 読者・視聴者との結びつきを作る能力
-        engagement: {
-          summary: getSummary(data, 'engagement', 'uniqueness',
-            "あなたの作品には、読者・視聴者の心に深く響く力があります。動物や子犬の魅力を通して人間の感情や社会との関わりを描き出す表現は、見る人の内面に強い共感と結びつきを生み出しています。単に情報を伝えるだけでなく、感情や思考に共鳴する表現で、多くの人々の心を動かす力を持っています。\n\nこの共感を呼ぶ力は、あなたの繊細な観察眼と深い共感性から生まれており、動物と人間の間に存在する普遍的な感情の橋渡しをしています。多様な背景を持つ人々の感情や経験を理解し、それに寄り添う表現は、幅広い層の視聴者に響きます。また、知的好奇心を刺激する内容と、感情に訴えかける表現のバランスが絶妙で、読者を知的にも感情的にも満足させる作品となっています。\n\n特に、複雑な動物行動や感情を親しみやすく伝える能力は、専門知識のない人々にも新たな発見と理解をもたらします。この「伝える力」は、あなたの作品が単なる情報発信を超えて、人々の認識や行動、さらには動物との関わり方にまで影響を与え、社会的な価値を創出する可能性を示しています。")
-        },
-        // サポート情報
-        expertise: {
-          summary: getSummary(data, 'expertise', '',
-            "データに基づいた分析と創造的な表現を組み合わせた独自のアプローチが特徴です。")
-        },
-        overall_insight: {
-          summary: getOverallSummary(data,
-            "あなたのクリエイティブな才能は、「創造性と独自性」「専門性とスキル」「影響力と共感」という3つの要素が有機的に結びつき、相互に高め合うことで生まれています。特に子犬や動物に関する深い知見と愛情を基盤とした独自の視点が、高い専門性とスキルによって説得力のある表現となり、それが読者との深い共感と結びつきを生み出しています。これらの要素は単独でも価値がありますが、あなたの中で調和することで、より大きな相乗効果を生み出しています。\n\n特筆すべきは、この3つの要素のバランスの良さです。動物と人間の関係性についての技術的な正確さと創造的な魅力、学術的な深さと情緒的な温かさ、専門性の高さと幅広い共感性を併せ持ち、多面的な価値を持つクリエイターとしての強みが現れています。あなたの作品に触れる人々は、動物への新たな理解と共に、知的な刺激と感情的な共鳴の両方を体験できるでしょう。\n\nこのような総合的な創作力は、動物への深い愛情と長年の探究、そして自己表現への真摯な姿勢から培われたものです。子犬や動物の魅力を伝えるあなたの作品は、人々の生活に潤いと新たな視点をもたらし、人間と動物の共生関係をより豊かにする可能性を秘めています。今後も、この3つの要素をさらに発展させ、バランスを保ちながら深化させていくことで、より広範な影響力と創造的な可能性が広がっていくでしょう。"),
-          future_potential: data.overall_insight?.future_potential || generateFuturePotential(data)
-        },
-        specialties: getArrayValue(data.specialties),
-        interests: {
-          areas: getArrayValue(data.interests?.areas || data.interests),
-          topics: getArrayValue(data.interests?.topics)
-        },
-        design_styles: getArrayValue(data.design_styles),
-        tag_frequency: typeof data.tag_frequency === 'object' && data.tag_frequency !== null
-          ? data.tag_frequency
-          : {}
-      }
-    };
-    
-    console.log('正規化したインサイトデータ:', normalizedData);
-    
-    return normalizedData;
+
   } catch (error) {
-    console.error('インサイト取得中にエラーが発生しました:', error);
-    return {
-      success: false,
-      error: error instanceof Error ? error.message : '不明なエラーが発生しました'
-    };
+    console.error(`インサイト取得中に予期せぬエラーが発生しました (${userId}):`, error);
+    if (error instanceof Error) {
+      console.error('スタックトレース:', error.stack);
+    }
+    return { success: false, error: 'インサイト取得中に予期せぬエラーが発生しました。' };
   }
 }
 

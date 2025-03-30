@@ -41,24 +41,15 @@ export function SignUpForm() {
     setError(null);
     
     try {
-      // 現在の環境に基づいてリダイレクトURIを設定
-      const isLocalhost = window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1';
+      // ログイン後のリダイレクト先をlocalStorageに保存
+      localStorage.setItem('redirect_after_login', '/mypage');
+      console.log('📍 ログイン後のリダイレクト先を設定:', '/mypage');
       
-      // Supabaseの認証URLを直接使用
-      const supabaseUrl = import.meta.env.VITE_SUPABASE_URL || '';
-      const redirectUri = isLocalhost 
-        ? `${window.location.origin}/auth/callback?redirectFrom=/login`
-        : `${supabaseUrl}/auth/callback?redirectFrom=/login`;
-      
-      console.log('Using redirect URI:', redirectUri);
-      console.log('Current origin:', window.location.origin);
-      console.log('Current hostname:', window.location.hostname);
-      console.log('Supabase URL:', supabaseUrl);
-      
-      const { data, error } = await supabase.auth.signInWithOAuth({
+      const { error } = await supabase.auth.signInWithOAuth({
         provider: 'google',
         options: {
-          redirectTo: redirectUri,
+          // コールバックURLを設定 (アプリ内のコールバックルートに合わせる)
+          redirectTo: `${window.location.origin}/auth/callback`,
           queryParams: {
             access_type: 'offline',
             prompt: 'consent',
@@ -66,13 +57,14 @@ export function SignUpForm() {
         },
       });
       
-      console.log('OAuth response:', data);
-      
-      if (error) throw error;
+      if (error) {
+        throw error;
+      }
       
       // Google認証はリダイレクトするため、ここではnavigateは不要
       // 認証後はAuthCallbackコンポーネントで指定したリダイレクト先に自動的にリダイレクトされます
     } catch (err) {
+      localStorage.removeItem('redirect_after_login'); // エラー時はクリーンアップ
       setError(err instanceof Error ? err.message : 'Googleログイン中にエラーが発生しました');
       setGoogleLoading(false);
     }

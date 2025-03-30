@@ -56,7 +56,13 @@ export async function fetchImageViaProxy(originalUrl: string): Promise<{ blob: B
       const response = await fetch(originalUrl);
       
       if (!response.ok) {
-        throw new Error(`画像の取得に失敗しました: ${response.status} ${response.statusText}`);
+        // 直接fetch失敗時のエラーハンドリングも少し詳細にする
+        let errorDetails = '';
+        try {
+          errorDetails = await response.text(); 
+        } catch (e) { /* ignore */ }
+        console.error(`直接画像の取得に失敗: ${response.status} ${response.statusText}`, errorDetails);
+        throw new Error(`画像の取得に失敗しました: ${response.status} ${response.statusText}${errorDetails ? ` - ${errorDetails.substring(0, 100)}` : ''}`);
       }
       
       const blob = await response.blob();
@@ -75,7 +81,26 @@ export async function fetchImageViaProxy(originalUrl: string): Promise<{ blob: B
     
     if (!response.ok) {
       console.error('プロキシを通したfetchに失敗:', response.status, response.statusText);
-      throw new Error(`画像の取得に失敗しました: ${response.status} ${response.statusText}`);
+      // ★★★ プロキシからのエラーレスポンスのボディを読み取る ★★★
+      let errorData = { error: `プロキシエラー: ${response.status} ${response.statusText}`, details: '詳細不明' };
+      try {
+        // Netlify Functionが返すJSON形式のエラーボディをパース
+        const proxyErrorBody = await response.json(); 
+        if (proxyErrorBody && proxyErrorBody.error) {
+          errorData = proxyErrorBody; 
+        }
+        console.error('プロキシからのエラー詳細:', errorData);
+      } catch (parseError) {
+        console.error('プロキシのエラーレスポンスの解析に失敗:', parseError);
+        // JSONでなくてもテキストとして読み取る試み
+        try {
+            const textBody = await response.text();
+            errorData.details = textBody.substring(0, 200); // 長すぎる場合に切り詰める
+            console.error('プロキシからのエラー本文(テキスト):', textBody);
+        } catch (textError) { /* ignore */ }
+      }
+      // ★★★ 取得した詳細情報を含めてエラーをスロー ★★★
+      throw new Error(`画像の取得に失敗しました: ${errorData.error}${errorData.details ? ` (${errorData.details})` : ''}`);
     }
     
     // レスポンスからBlobとContent-Typeを取得
@@ -85,8 +110,8 @@ export async function fetchImageViaProxy(originalUrl: string): Promise<{ blob: B
     console.log('プロキシを通したfetchに成功しました。Content-Type:', contentType);
     return { blob, contentType };
   } catch (error) {
-    console.error('プロキシ経由の画像取得エラー:', error);
-    throw error;
+    console.error('プロキシ経由の画像取得エラー:', error); // ここでキャッチされるのは上のthrow new Error
+    throw error; // エラーを再スローして上位の関数に伝える
   }
 }
 

@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useCallback, useRef } from 'react';
-import { useNavigate, useParams, Link } from 'react-router-dom';
+import { useNavigate, useParams } from 'react-router-dom';
 import { supabase } from '../../lib/supabase';
 import { useToast } from '../../lib/hooks/useToast';
 import { 
@@ -15,19 +15,7 @@ import {
   LogOut,
   FileType,
   Image,
-  Lightbulb,
-  PlusIcon,
-  ShareIcon,
-  ArrowLeftIcon,
-  ArrowRightIcon,
-  MessageCircleIcon,
-  EyeIcon,
-  MoreHorizontalIcon,
-  CameraIcon,
-  ThumbsUpIcon,
-  ThumbsDownIcon,
-  InfoIcon
-} from 'lucide-react';
+  Lightbulb} from 'lucide-react';
 import { 
   AreaChart, 
   Area, 
@@ -38,11 +26,13 @@ import {
   ResponsiveContainer 
 } from 'recharts';
 import { analyzeUserTagsApi } from '../../api/tag-analysis-api';
-import { getUserInsightsApi, UserInsightsResult } from '../../api/tag-analysis-api';
-import { analyzeUserTagsDirectly } from '../../lib/tag-analysis';
+import { getUserInsightsApi } from '../../api/tag-analysis-api';
 // 型定義をインポート
 import { UserProfile, Work, Career, AIAnalysisResult } from '../../types';
 import { Loader2 as Spinner } from "lucide-react";
+
+// 最初のimport文の直後にデバッグログを追加
+console.log('🔍 マイページコンポーネントのコードが読み込まれました');
 
 const MONTHS = [
   '1月', '2月', '3月', '4月', '5月', '6月',
@@ -50,6 +40,8 @@ const MONTHS = [
 ];
 
 const Mypage: React.FC = () => {
+  console.log('🔍 マイページコンポーネントが初期化されました');
+  
   const [userProfile, setUserProfile] = useState<UserProfile | null>(null);
   const [works, setWorks] = useState<Work[]>([]);
   const [careers, setCareers] = useState<Career[]>([]);
@@ -87,6 +79,7 @@ const Mypage: React.FC = () => {
   const toast = useToast();
   const navigate = useNavigate();
   const params = useParams();
+  const [, setIsLoadingInsights] = useState<boolean>(false); // ★ インサイト読み込み状態を追加
 
   // ユーザープロファイルの取得
   const fetchUserProfile = useCallback(async () => {
@@ -95,125 +88,163 @@ const Mypage: React.FC = () => {
       
       // URLパラメータからIDを取得、なければ現在のユーザーのIDを使用
       const profileId = params.id;
-      
-      console.log('プロフィールを取得するID:', profileId);
+      let userIdToFetch: string | null = null;
+      let isFetchingOwnProfile = false;
+
+      console.log('プロフィールを取得するID (params.id):', profileId);
       
       if (profileId) {
         // 他のユーザーのプロフィールを表示する場合
-        // IDの形式チェックを一時的に無効化（デバッグ用）
-        /*
-        const uuidRegex = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
-        if (!uuidRegex.test(profileId)) {
-          console.error('無効なユーザーID形式:', profileId);
-          toast({
-            title: 'エラー',
-            description: 'プロフィールの取得に失敗しました。無効なユーザーIDです。',
-            variant: 'destructive'
-          });
-          return;
-        }
-        */
-        
-        // プロフィールデータを取得
-        console.log('Supabaseクエリを実行:', 'profiles', 'id =', profileId);
-        const { data, error } = await supabase
-          .from('profiles')
-          .select('*')
-          .eq('id', profileId)
-          .single();
-          
-        console.log('取得したプロフィールデータ:', data, 'エラー:', error);
-          
-        if (error) {
-          console.error('Error fetching profile:', error);
-          toast({
-            title: 'エラー',
-            description: 'プロフィールの取得に失敗しました',
-            variant: 'destructive'
-          });
-          return;
-        }
-        
-        if (!data) {
-          console.error('プロフィールが見つかりません');
-          toast({
-            title: 'エラー',
-            description: 'プロフィールが見つかりません',
-            variant: 'destructive'
-          });
-          return;
-        }
-        
-        setUserProfile(data);
-        setIsCurrentUser(false); // 他のユーザーのプロフィールを表示していて
-        
-        // プロフィールデータが取得できたら、そのユーザーの作品と職歴とAI分析結果を取得
-        // 非同期処理を待たずに次の処理に進むことを防ぐため、awaitを使用
-        await Promise.all([
-          fetchUserWorks(profileId),
-          fetchUserCareers(profileId),
-          fetchUserInsights(profileId)
-        ]);
-        
-        console.log('他のユーザーのデータ取得完了:',
-          'プロフィール:', data,
-          'works:', works.length,
-          'careers:', careers.length,
-          'hasAnalysis:', hasAnalysis
-        );
+        userIdToFetch = profileId;
+        setIsCurrentUser(false);
+        console.log('他のユーザーのプロフィールをフェッチします。');
       } else {
         // 自分のプロフィールを表示する場合
-        const { data: { user } } = await supabase.auth.getUser();
+        console.log('自分のプロフィールをフェッチします。');
+        const { data: { user }, error: userError } = await supabase.auth.getUser();
         
-        if (!user) {
+        if (userError) {
+          console.error('❌ ユーザーセッションの取得エラー:', userError);
+          toast({ title: 'エラー', description: 'ユーザー情報の取得に失敗しました。再度ログインしてください。', variant: 'destructive' });
           navigate('/login');
           return;
         }
-        
-        const { data, error } = await supabase
-          .from('profiles')
-          .select('*')
-          .eq('id', user.id)
-          .single();
-          
-        if (error && error.code !== 'PGRST116') {
-          throw error;
+
+        if (!user) {
+          console.error('❌ ログインしていません。ログインページにリダイレクトします。');
+          toast({ title: 'ログインが必要です', description: 'プロフィールを表示するにはログインしてください。', variant: 'destructive' });
+          navigate('/login');
+          return;
         }
-        
-        // プロフィールが存在しない場合は新規作成
-        if (!data) {
-          const newProfile: UserProfile = {
-            id: user.id,
-            full_name: user.user_metadata?.name || '',
-            about: '',
-            created_at: new Date().toISOString(),
-            profile_image_url: '',
-            website_url: ''
-          };
-          
-          const { error: insertError } = await supabase
-            .from('profiles')
-            .insert(newProfile);
-            
-          if (insertError) throw insertError;
-          
-          setUserProfile(newProfile);
-        } else {
-          setUserProfile(data);
-        }
-        
-        setIsCurrentUser(true); // 自分のプロフィールを表示してている
+        userIdToFetch = user.id;
+        isFetchingOwnProfile = true;
+        setIsCurrentUser(true);
       }
+
+      if (!userIdToFetch) {
+        console.error('❌ フェッチ対象のユーザーIDが不明です。');
+        toast({ title: 'エラー', description: 'ユーザー情報の取得に失敗しました。', variant: 'destructive' });
+        return;
+      }
+
+      console.log('Supabaseクエリを実行 (profiles): id =', userIdToFetch);
+      // .maybeSingle() を使用してデータが存在しない場合にエラーではなく null を返すようにする
+      const { data: profileData, error: selectError } = await supabase
+        .from('profiles')
+        .select('*')
+        .eq('id', userIdToFetch)
+        .maybeSingle(); // ★ .single() から .maybeSingle() に変更
+          
+      // select時のエラー詳細ログ
+      if (selectError) {
+        console.error('❌ プロフィール取得エラー (select):', selectError);
+        console.error('   エラーコード:', selectError.code);
+        console.error('   メッセージ:', selectError.message);
+        console.error('   詳細:', selectError.details);
+        console.error('   ヒント:', selectError.hint);
+        toast({
+          title: 'エラー',
+          description: `プロフィールの取得に失敗しました: ${selectError.message}`,
+          variant: 'destructive'
+        });
+        // maybeSingle を使っているので、特定のエラーコード(PGRST116等)で処理を続ける必要はない
+        // 致命的なエラーとして処理を中断
+        setIsLoading(false);
+        return; 
+      }
+        
+      // プロフィールデータが取得できた場合
+      if (profileData) {
+        console.log('✅ プロフィール取得成功:', profileData);
+        setUserProfile(profileData);
+
+        // 他のユーザーの場合、または自分のプロフィールでデータがあった場合は、作品等も取得
+        if (!isFetchingOwnProfile || (isFetchingOwnProfile && profileData)) {
+          await Promise.all([
+            fetchUserWorks(userIdToFetch),
+            fetchUserCareers(userIdToFetch),
+            fetchUserInsights(userIdToFetch)
+          ]);
+          console.log('関連データ取得完了 (Works, Careers, Insights)');
+        }
+      } 
+      // プロフィールデータがなく、かつ自分のプロフィールを取得しようとしている場合 (新規ユーザー)
+      else if (isFetchingOwnProfile && !profileData) {
+        console.log('ℹ️ プロフィールが存在しないため、新規作成します。');
+        const { data: { user } } = await supabase.auth.getUser(); // ユーザー情報を再取得 (念のため)
+        if (!user) {
+          console.error('❌ 新規プロフィール作成時にユーザー情報が見つかりません。');
+          navigate('/login');
+          return;
+        }
+
+        const newProfile: UserProfile = {
+          id: user.id,
+          // Googleログインの場合、user_metadata から取得 (なければ空文字)
+          full_name: user.user_metadata?.full_name || user.user_metadata?.name || '',
+          about: '',
+          created_at: new Date().toISOString(),
+          profile_image_url: user.user_metadata?.avatar_url || '', // Googleの avatar_url を使う
+          website_url: ''
+          // 他の必須フィールドがあれば初期値を設定
+        };
+        
+        console.log('挿入する新しいプロフィールデータ:', newProfile);
+
+        const { error: insertError } = await supabase
+          .from('profiles')
+          .insert(newProfile);
+            
+        // insert時のエラー詳細ログ
+        if (insertError) {
+          console.error('❌ 新規プロフィール作成エラー (insert):', insertError);
+          console.error('   エラーコード:', insertError.code);
+          console.error('   メッセージ:', insertError.message);
+          console.error('   詳細:', insertError.details);
+          console.error('   ヒント:', insertError.hint);
+          // 409 Conflict の場合は特にログ出力
+          if (insertError.code === '23505') { // PostgreSQL の unique_violation コード
+            console.error('   => 原因: 同じIDのプロフィールが既に存在します (一意性制約違反)。競合が発生した可能性があります。');
+          } else {
+             console.error('   => 原因: データベースエラーまたはRLSポリシーの問題の可能性があります。');
+          }
+          toast({
+            title: 'エラー',
+            description: `プロフィールの作成に失敗しました: ${insertError.message}`,
+            variant: 'destructive'
+          });
+          // エラーが発生しても、最低限のプロフィール情報をステートに設定して表示を試みる
+          setUserProfile(newProfile); 
+        } else {
+          console.log('✅ 新規プロフィール作成成功');
+          setUserProfile(newProfile);
+          // 新規作成時は Works, Careers, Insights は空なのでフェッチ不要
+        }
+      }
+      // 他のユーザーのプロフィールが見つからなかった場合
+      else if (!isFetchingOwnProfile && !profileData) {
+        console.error('❌ 指定されたIDのプロフィールが見つかりません。');
+        toast({
+          title: 'エラー',
+          description: '指定されたプロフィールが見つかりません。',
+          variant: 'destructive'
+        });
+        // エラーページに遷移するか、前のページに戻るなどの処理が必要かも
+        navigate(-1); // 例: 前のページに戻る
+      }
+
     } catch (error) {
-      console.error('Error fetching user profile:', error);
+      console.error('❌ fetchUserProfile 関数内で予期せぬエラー:', error);
       toast({
         title: 'エラー',
-        description: 'プロフィールの取得に失敗しました',
+        description: 'プロフィールの取得中に予期せぬエラーが発生しました',
         variant: 'destructive'
       });
     } finally {
       setIsLoading(false);
+      console.log('fetchUserProfile 処理完了');
     }
+  // 依存配列を修正: fetchUserWorks, fetchUserCareers, fetchUserInsights を削除
   }, [navigate, toast, params.id]);
 
   // ユーザーの作品一覧を取得する関数
@@ -365,149 +396,187 @@ const Mypage: React.FC = () => {
   }, [isCurrentUser]);
 
   // ユーザーのAI分析結果を取得
-  const fetchUserInsights = useCallback(async (userId: string) => {
-    try {
-      if (!userId) {
-        console.error('ユーザーIDがありません');
-        return;
-      }
-      
-      console.log('AI分析結果を取得するユーザーID:', userId);
-      
-      // getUserInsightsApiを使用して取得
-      const result = await getUserInsightsApi(userId);
-      
-      console.log('取得したAI分析結果:', result);
-      
-      if (!result.success || !result.data) {
-        // エラーの種類に応じた処理
-        if (result.error === 'No insights found for this user') {
-          console.log('ユーザーのインサイトが見つかりませんでした。AI分析を実行すると生成されます。');
-          // インサイトがない場合はhasAnalysisをfalseに設定
-          setHasAnalysis(false);
-          
-          // 他のユーザーのプロフィールを表示している場合は、サンプルの分析結果を表示
-          if (!isCurrentUser) {
-            console.log('他のユーザーのプロフィール表示中: サンプル分析結果を表示');
-            setAiAnalysisResult({
-              originality: {
-                summary: 'このユーザーはまだAI分析を実行していません。'
-              },
-              quality: {
-                summary: 'AI分析が実行されると、ユーザーの才能や特徴が表示されます。'
-              },
-              expertise: {
-                summary: '分析できます'
-              },
-              engagement: {
-                summary: '分析できます'
-              },
-              specialties: [],
-              interests: {
-                areas: [],
-                topics: []
-              },
-              design_styles: [],
-              overall_insight: {
-                summary: 'このユーザーはまだAI分析を実行していません。分析結果は、作品のタグに基づいて専門性やスタイルを分析したものです。',
-                future_potential: '将来的には、さらに多くの可能性を広げていくでしょう。新たな挑戦や異なる分野との融合を通じて、クリエイターとしての価値をさらに高めていくことができます。新たな挑戦や異なる分野との融合を通じて、クリエイターとしての価値をさらに高めていくことができます。自分の強みを活かしながら、好奇心を持って探求を続けることが、長期的な成長につながります。'
-              }
-            });
-            setHasAnalysis(true);
-          }
-        } else {
-          // その他のエラー
-          console.error('Error fetching user insights:', result.error);
-          toast({
-            title: 'インサイトの取得に失敗しました',
-            description: 'AI分析結果の取得中にエラーが発生しました。時間をおいて再度お試しください。',
-            variant: 'destructive'
-          });
-        }
-        return;
-      }
+  const fetchUserInsights = useCallback(async (userIdToFetch: string) => {
+    setIsLoadingInsights(true); // ローディング開始
+    console.log('ユーザーインサイトの取得を開始します - ユーザーID:', userIdToFetch);
 
-      const insightData = result.data || {
-        originality: { summary: '' },
-        quality: { summary: '' },
-        expertise: { summary: '' },
-        engagement: { summary: '' },
-        specialties: [],
-        design_styles: [],
-        overall_insight: { summary: '', future_potential: '' }
-      };
-      console.log('取得したユーザーインサイト:', insightData);
-      
-      // 分析結果をステートに設定
-      const analysisResult: AIAnalysisResult = {
-        originality: {
-          summary: insightData.originality?.summary || 'ライティングとコンテンツ制作において高い専門性を持っています。'
-        },
-        quality: {
-          summary: insightData.quality?.summary || '明確で簡潔な表現スタイルで、読者に伝わりやすい文章を作成します。'
-        },
-        expertise: {
-          summary: insightData.expertise?.summary || 'データに基づいた分析と創造的な表現を組み合わせた独自のアプローチが特徴です。'
-        },
-        engagement: {
-          summary: insightData.engagement?.summary || '独自の視点と表現スタイルを持ち、読者に新たな価値を提供します。'
-        },
-        specialties: insightData.specialties || ['ライティング', 'コンテンツ制作', 'クリエイティブ'],
-        interests: {
-          areas: insightData.specialties?.slice(0, 3) || ['コンテンツマーケティング', 'デジタルメディア', 'クリエイティブ表現'],
-          topics: insightData.specialties?.slice(3, 6) || []
-        },
-        design_styles: insightData.design_styles || ['シンプル', '明快', '効果的'],
-        overall_insight: {
-          summary: insightData.overall_insight?.summary || 'これらの要素は相互に関連し合い、クリエイターとしての総合的な価値を形成しています。一つの要素が他の要素を強化し、全体として独自の魅力を生み出しています。あなたの作品は、専門性と創造性のバランスが取れており、読者に新たな視点や価値を提供しています。',
-          future_potential: insightData.overall_insight?.future_potential || 'あなたの創造性と情熱は、今後さらに多くの可能性を広げていくでしょう。新たな挑戦や異なる分野との融合を通じて、クリエイターとしての価値をさらに高めていくことができます。自分の強みを活かしながら、好奇心を持って探求を続けることが、長期的な成長につながります。'
+    try {
+      const result = await getUserInsightsApi(userIdToFetch);
+
+      // API 呼び出し成功の場合
+      if (result.success) {
+        // データが存在する場合 (result.data が null や undefined でない)
+        if (result.data) {
+          console.log('取得したユーザーインサイト:', result.data);
+          const insightData = result.data;
+
+          // 分析結果をステートに設定
+          const analysisResult: AIAnalysisResult = {
+            originality: { summary: insightData.originality?.summary || '不明' },
+            quality: { summary: insightData.quality?.summary || '不明' },
+            expertise: { summary: insightData.expertise?.summary || '不明' },
+            engagement: { summary: insightData.engagement?.summary || '不明' },
+            specialties: insightData.specialties || [],
+            // interests の整形ロジック（specialties から生成）
+            interests: {
+              areas: insightData.specialties?.slice(0, 3) || [],
+              topics: insightData.specialties?.slice(3, 6) || []
+            },
+            design_styles: insightData.design_styles || [],
+            overall_insight: {
+              summary: insightData.overall_insight?.summary || '分析データがまだありません。',
+              future_potential: insightData.overall_insight?.future_potential || '作品を追加すると分析が開始されます。'
+            }
+          };
+          setAiAnalysisResult(analysisResult);
+          setHasAnalysis(true); // 分析結果あり
+        } else {
+          // データが存在しない場合 (API が success: true, data: undefined を返した場合)
+          console.log('ユーザーにはまだインサイトデータがありません。AI分析結果を初期化します。');
+          // データがない場合の初期値を設定
+          setAiAnalysisResult({
+            originality: { summary: '-' }, // 分析前を示す表示
+            quality: { summary: '-' },
+            expertise: { summary: '-' },
+            engagement: { summary: '-' },
+            specialties: [],
+            interests: { areas: [], topics: [] },
+            design_styles: [],
+            overall_insight: {
+              summary: 'AI分析はまだ実行されていません。作品を追加・公開すると、あなたの特徴が分析されます。',
+              future_potential: 'ポートフォリオを充実させて、AIによるインサイトを得ましょう。'
+            }
+          });
+          setHasAnalysis(false); // 分析結果なし
         }
-      };
-      
-      setAiAnalysisResult(analysisResult);
-      
-      setHasAnalysis(true);
-      // ページの初期ロード時のポップアップは表示しない（明示的なAI分析実行時のみ表示）
-    } catch (error) {
-      console.error('Error analyzing user tags:', error);
+      } else {
+        // API 呼び出し失敗の場合 (success: false)
+        console.error('Error fetching user insights:', result.error);
+        toast({
+          title: 'インサイト取得エラー',
+          description: result.error || 'AI分析結果の取得中に不明なエラーが発生しました。',
+          variant: 'destructive'
+        });
+        // エラー時も初期値を設定して表示を安定させる
+        setAiAnalysisResult({
+          originality: { summary: 'エラー' },
+          quality: { summary: 'エラー' },
+          expertise: { summary: 'エラー' },
+          engagement: { summary: 'エラー' },
+          specialties: [],
+          interests: { areas: [], topics: [] },
+          design_styles: [],
+          overall_insight: {
+            summary: 'インサイト情報の取得中にエラーが発生しました。',
+            future_potential: '時間をおいて再度お試しください。'
+          }
+        });
+        setHasAnalysis(false); // 分析結果なし
+      }
+    } catch (error) { // fetchUserInsights 関数自体のエラー
+      console.error('Critical error in fetchUserInsights function:', error);
       toast({
-        title: 'タグ分析に失敗しました',
-        description: error instanceof Error ? error.message : '不明なエラーが発生しました',
+        title: '重大なエラー',
+        description: 'インサイト情報の処理中に予期せぬ問題が発生しました。',
         variant: 'destructive'
       });
+      // エラー時も初期値を設定
+      setAiAnalysisResult({
+          originality: { summary: 'エラー' },
+          quality: { summary: 'エラー' },
+          expertise: { summary: 'エラー' },
+          engagement: { summary: 'エラー' },
+          specialties: [],
+          interests: { areas: [], topics: [] },
+          design_styles: [],
+          overall_insight: {
+            summary: 'インサイト情報の取得中にエラーが発生しました。',
+            future_potential: '時間をおいて再度お試しください。'
+          }
+      });
+      setHasAnalysis(false);
+    } finally {
+      setIsLoadingInsights(false); // ローディング終了
+      console.log('ユーザーインサイトの取得処理が完了しました。');
     }
-  }, [isCurrentUser, toast]);
+  // 依存配列を確認・修正 (getUserInsightsApi を追加)
+  }, [toast, getUserInsightsApi]);
 
   // コンポーネントの初期化
   useEffect(() => {
     const initializeComponent = async () => {
       try {
+        console.log('🚀 マイページコンポーネントを初期化しています...');
+        
         // URLパラメータからプロフィールIDを取得
         const profileId = params.id;
         
         if (profileId) {
+          console.log('📌 他のユーザーのプロフィールを表示します:', profileId);
           // 他のユーザーのプロフィールを表示する場合
           await fetchUserProfile();
         } else {
           // 自分のプロフィールを表示する場合、ログイン状態を確認
-          const { data } = await supabase.auth.getSession();
+          console.log('🔍 ログイン状態を確認しています...');
+          const { data, error } = await supabase.auth.getSession();
           
-          if (!data.session) {
-            // ログインしていない場合はログインページにリダイレクト
-            toast({
-              title: 'ログインが必要です',
-              description: 'マイページを表示するにはログインしてください',
-              variant: 'destructive'
+          if (error) {
+            console.error('❌ セッション取得エラー:', error);
+            toast.error({
+              title: 'セッションエラー',
+              description: 'ログイン状態の確認中にエラーが発生しました。再度ログインしてください。'
             });
             navigate('/login');
             return;
           }
           
+          if (!data.session) {
+            console.error('❌ セッションがありません - ログイン必要');
+            
+            // Google認証プロセス中の場合、エラーメッセージは表示しない
+            const isGoogleAuthInProgress = localStorage.getItem('google_auth_in_progress') === 'true';
+            if (isGoogleAuthInProgress) {
+              console.log('ℹ️ Google認証処理中のため、リダイレクトのみを行います');
+              
+              // 2分以上経過している場合はタイムアウト扱いにする
+              const timestamp = Number(localStorage.getItem('google_auth_timestamp') || '0');
+              const elapsed = Date.now() - timestamp;
+              if (elapsed > 2 * 60 * 1000) {  // 2分
+                console.log('⚠️ 認証タイムアウト - 経過時間:', elapsed / 1000, '秒');
+                localStorage.removeItem('google_auth_in_progress');
+                localStorage.removeItem('google_auth_timestamp');
+                
+                toast.error({
+                  title: '認証タイムアウト',
+                  description: 'Google認証処理がタイムアウトしました。再度ログインしてください。'
+                });
+              }
+            } else {
+              // 通常のログインエラー
+              toast.error({
+                title: 'ログインが必要です',
+                description: 'マイページを表示するにはログインしてください'
+              });
+            }
+            
+            navigate('/login');
+            return;
+          }
+          
+          console.log('✅ ログイン済み - ユーザーID:', data.session.user.id);
+          
           // ログインしている場合は自分のプロフィールを取得
           await fetchUserProfile();
         }
       } catch (error) {
-        console.error('Error initializing component:', error);
+        console.error('❌ コンポーネント初期化エラー:', error);
+        
+        toast.error({
+          title: 'エラーが発生しました',
+          description: 'ページの読み込み中にエラーが発生しました。再度お試しください。'
+        });
+        
+        navigate('/login');
       }
     };
     
@@ -537,10 +606,9 @@ const Mypage: React.FC = () => {
   // ユーザーのタグを分析
   const analyzeUserTagsLocal = useCallback(async () => {
     if (!userProfile) {
-      toast({
+      toast.error({
         title: '分析できません',
-        description: 'プロフィール情報が取得できません。再度ログインしてお試しください。',
-        variant: 'destructive'
+        description: 'プロフィール情報が取得できません。再度ログインしてお試しください。'
       });
       return;
     }
@@ -552,10 +620,9 @@ const Mypage: React.FC = () => {
       // 作品がない場合はエラーメッセージを表示
       if (works.length === 0) {
         console.error('分析エラー: 作品が存在しません');
-        toast({
+        toast.error({
           title: '分析できません',
-          description: '作品がありません。作品を追加してから再度お試しください。',
-          variant: 'destructive'
+          description: '作品がありません。作品を追加してから再度お試しください。'
         });
         setIsAnalyzing(false);
         return;
@@ -577,10 +644,9 @@ const Mypage: React.FC = () => {
       // タグがない場合はエラーメッセージを表示
       if (totalTags === 0) {
         console.error('分析エラー: 作品にタグが存在しません');
-        toast({
+        toast.error({
           title: '分析できません',
-          description: '作品にタグがありません。作品にタグを追加してから再度お試しください。',
-          variant: 'destructive'
+          description: '作品にタグがありません。作品にタグを追加してから再度お試しください。'
         });
         setIsAnalyzing(false);
         return;
@@ -613,10 +679,9 @@ const Mypage: React.FC = () => {
         }
         
         // エラー処理
-        toast({
+        toast.error({
           title: 'API実行エラー',
-          description: apiError instanceof Error ? apiError.message : '不明なエラーが発生しました',
-          variant: 'destructive'
+          description: apiError instanceof Error ? apiError.message : '不明なエラーが発生しました'
         });
         setIsAnalyzing(false);
         return;
@@ -625,10 +690,9 @@ const Mypage: React.FC = () => {
       if (!result.success || !result.data) {
         console.error('タグ分析に失敗しました:', result.error);
         
-        toast({
+        toast.error({
           title: 'タグ分析に失敗しました',
-          description: result.error || '不明なエラーが発生しました',
-          variant: 'destructive'
+          description: result.error || '不明なエラーが発生しました'
         });
         setIsAnalyzing(false);
         return;
@@ -671,7 +735,7 @@ const Mypage: React.FC = () => {
       if (isAnalyzing) {
         toast({
           title: 'タグ分析が完了しました',
-          description: 'あなたの作品のタグに基づいて専門性やスタイルを分析しました',
+          description: 'あなたの作品のタグに基づいて専門性やスタイルを分析しました'
         });
       }
     } catch (error) {
@@ -683,10 +747,9 @@ const Mypage: React.FC = () => {
         console.error('不明なエラー型:', typeof error);
       }
       
-      toast({
+      toast.error({
         title: 'タグ分析に失敗しました',
-        description: error instanceof Error ? error.message : '不明なエラーが発生しました',
-        variant: 'destructive'
+        description: error instanceof Error ? error.message : '不明なエラーが発生しました'
       });
     } finally {
       setIsAnalyzing(false);
@@ -1070,128 +1133,39 @@ const Mypage: React.FC = () => {
   };
 
   // タグの頻度データから直接分析を行う関数
-  const analyzeUserTagsDirectly = async (tagFrequency: Record<string, number>): Promise<UserInsightsResult> => {
-    console.log('タグ頻度データを使用して直接分析を実行:', tagFrequency);
+
+  // ページタイトルをセット
+  useEffect(() => {
+    // URLパラメータからプロフィールIDを取得
+    const profileId = params.id;
     
-    try {
-      // タグの出現回数でソート
-      const sortedTags = Object.entries(tagFrequency)
-        .sort(([, countA], [, countB]) => countB - countA);
-      
-      // 上位のタグを抽出
-      const topTags = sortedTags.slice(0, 5).map(([tag]) => tag);
-      const allTags = sortedTags.map(([tag]) => tag);
-      
-      // 分野を推測する簡易ロジック
-      const determineAreas = (tags: string[]): string[] => {
-        const areaMap: Record<string, string[]> = {
-          'デザイン': ['デザイン', 'UI', 'UX', 'グラフィック', 'ビジュアル', 'レイアウト'],
-          'プログラミング': ['プログラミング', 'コーディング', '開発', 'システム', 'アプリ'],
-          'ライティング': ['ライティング', '文章', '記事', 'コンテンツ', 'ブログ'],
-          'マーケティング': ['マーケティング', '広告', 'PR', 'SEO', '販促'],
-          'イラスト': ['イラスト', '絵', 'アート', '描画', 'キャラクター'],
-          '写真': ['写真', 'カメラ', '撮影', 'フォト'],
-          'ビデオ': ['ビデオ', '動画', '映像', '編集', 'モーション']
-        };
-        
-        // タグに基づいて分野をカウント
-        const areaCounts: Record<string, number> = {};
-        
-        tags.forEach(tag => {
-          Object.entries(areaMap).forEach(([area, keywords]) => {
-            if (keywords.some(keyword => tag.includes(keyword))) {
-              areaCounts[area] = (areaCounts[area] || 0) + 1;
-            }
-          });
-        });
-        
-        // 出現回数でソート
-        return Object.entries(areaCounts)
-          .sort(([, countA], [, countB]) => countB - countA)
-          .slice(0, 3)
-          .map(([area]) => area);
-      };
-      
-      // 作品内の総タグ数
-      const totalTags = Object.values(tagFrequency).reduce((sum, count) => sum + count, 0);
-      
-      // タグの多様性を計算
-      const uniqueTagsCount = Object.keys(tagFrequency).length;
-      const tagDiversity = Math.min(1, uniqueTagsCount / 10); // 10種類以上で最大
-      
-      // 推定される専門性、オリジナリティ、クオリティを計算
-      const expertiseLevel = Math.min(0.9, 0.3 + (totalTags / 30) * 0.3 + tagDiversity * 0.3);
-      const originalityLevel = Math.min(0.9, 0.4 + tagDiversity * 0.5);
-      const qualityLevel = Math.min(0.9, 0.4 + (totalTags / 20) * 0.5);
-      
-      // 興味分野を特定
-      const interestAreas = determineAreas(allTags);
-      
-      // 分析結果を生成
-      return {
-        success: true,
-        data: {
-          originality: {
-            summary: `独自の視点と表現スタイルを持っています。未来、子犬、動物に関して特に深い知見を示し、既存の概念に独自の解釈を加えています。特に、日常的な題材を独自の視点で捉え直す能力が際立っています。
-
-${topTags[0] || 'クリエイティブ表現'}と${topTags[1] || 'コンテンツ制作'}において、他者とは一線を画すアプローチで作品を創出する傾向があります。従来の表現手法にとらわれず、斬新な角度からテーマを掘り下げることで、観る人に新たな視点を提供しています。その作風には一貫した個性が感じられ、一目見ただけでクリエイターの特徴を認識できる独自性が備わっています。
-
-また、既成概念を覆す挑戦的な姿勢も見られ、実験的な試みや革新的な表現技法を積極的に取り入れる柔軟性を持っています。こうした創造的な取り組みが、作品に唯一無二の魅力と価値をもたらしています。特に${topTags[0] || 'クリエイティブ表現'}分野における独創的な思考は、今後さらに多様な分野での活躍が期待される重要な強みとなっています。`
-          },
-          quality: {
-            summary: `専門性とスキルが高く、信頼性のあるコンテンツを作成する能力に優れています。${topTags[0] || 'クリエイティブ分野'}において、技術的な完成度の高い作品を一貫して提供しており、細部への配慮と全体のバランスが取れた構成力が特徴的です。
-
-作品からは、長年培われてきた経験と知識が感じられます。特に${interestAreas[0] || 'クリエイティブ'}分野における専門的な理解が深く、業界の最新トレンドや標準的な手法に精通していることが伺えます。同時に、技術的なスキルと創造的な表現力を効果的に組み合わせる能力も持ち合わせており、複雑な課題に対しても明快な解決策を提示することができます。
-
-また、作品の質を維持するための厳格な自己基準を持ち、一貫性のある高水準の制作を実現しています。このような専門性の高さは、クライアントや視聴者からの信頼を獲得する重要な要素となっており、長期的な関係構築にも寄与しています。特に${topTags[0] || 'クリエイティブ分野'}における深い専門知識と実践的なスキルの組み合わせは、市場での競争力を高める大きな強みとなっています。`
-          },
-          expertise: {
-            summary: `${interestAreas[0] || 'クリエイティブ'}と${interestAreas[1] || 'コンテンツ制作'}を中心に幅広い専門知識を持ち、実践的なスキルを活かした作品作りが特徴です。複数の分野にまたがる知識を融合させる能力に長けており、分野横断的な視点からの独自のアプローチが見られます。
-
-継続的な学習と経験の蓄積により、専門領域における深い洞察力と問題解決能力を培っています。特に${interestAreas[0] || 'クリエイティブ'}分野においては、理論的な知識だけでなく、現場での実践経験に基づいた応用力も備えており、理想と現実のバランスを取りながら最適な成果を導き出す能力が際立っています。
-
-また、多様な専門知識を持つことで、異なる分野の概念やテクニックを柔軟に取り入れ、革新的なアイデアを生み出す土台となっています。このような学際的アプローチは、既存の枠組みを超えた新たな価値創造につながっており、クリエイターとしての可能性を大きく広げています。今後も専門性をさらに深めながら、新たな領域への挑戦を続けることで、より多面的な価値を提供できるでしょう。`
-          },
-          engagement: {
-            summary: `読者や視聴者との共感を生み出す表現力に優れており、特に${topTags[0] || 'コンテンツ'}を通じて人々と強い繋がりを構築しています。作品にはユニークな視点と同時に、普遍的な感情や経験に訴えかける要素が巧みに組み込まれており、幅広い層からの共感を獲得しています。
-
-その表現は単なる情報伝達にとどまらず、受け手の感情や思考に深く訴えかけるストーリーテリング能力が際立っています。特に${topTags[0] || 'コンテンツ'}においては、複雑なテーマでも親しみやすく伝える方法を心得ており、専門知識がない人々にも響く表現方法を実現しています。
-
-また、社会的な問題意識や時代の変化を敏感に捉え、それらを作品に反映させる洞察力も備えています。このような姿勢は、単に「いいね」を集めるだけでなく、持続的な対話や関係性の構築につながっています。視聴者との間に形成される信頼関係は、一時的な注目を超えた長期的な影響力の源泉となっており、真のエンゲージメントを生み出しています。
-
-時には挑戦的な視点を提示することで、新たな対話や思考を促す触媒としての役割も果たしており、コミュニティに価値ある貢献をしています。`
-          },
-          overall_insight: {
-            summary: `様々な要素が有機的に組み合わさり、クリエイターとしての独自の強みを形成しています。特に${interestAreas[0] || 'クリエイティブ分野'}における専門性と、${topTags[0] || 'オリジナル'}コンテンツ制作の能力が際立っており、これらが相互に補完し合うことで、独自のクリエイティブ・アイデンティティが確立されています。
-
-創造性と専門性のバランスが優れており、革新的なアイデアを実現するための確かな技術基盤を持っていることが大きな強みです。また、人々の感情や関心に寄り添いながらも、新たな視点を提供する表現スタイルは、作品に深みと共感性をもたらしています。
-
-タグ分析からは、特定の分野に対する継続的な探求心と、多様なテーマへの関心が見て取れます。このような一貫性と多様性の両立は、クリエイターとしての持続的な成長と発展を支える重要な要素となっています。
-
-特に${topTags.slice(0, 2).join('と')}に関連する作品には、独自の世界観と技術的な完成度の高さが表れており、これらの領域における深い造詣と創造的な表現力が評価されています。今後も独自の視点と専門性を軸としながら、新たな表現の可能性を追求していくことで、より幅広い影響力を持つクリエイターとしての道を切り拓いていくでしょう。`,
-            future_potential: `今後さらに${interestAreas[1] || '新しい分野'}や${interestAreas[2] || 'テクノロジー'}との融合を進めることで、より幅広い表現の可能性を広げていくことができるでしょう。現在の強みを基盤としながら、異なる分野の知見や技術を取り入れることで、これまでにない革新的な作品を生み出す潜在力を秘めています。
-
-特に、デジタル技術の進化やオーディエンスの消費傾向の変化に敏感に対応しながら、本質的な価値観や創造性を保持することが重要になるでしょう。また、国際的な視点や多様な文化的背景からの影響を積極的に取り入れることで、作品の普遍性と独自性をさらに高められる可能性があります。
-
-現在の専門分野をさらに深掘りしながらも、隣接する領域への理解を広げることで、クリエイティブの境界を押し広げ、新たなニッチや表現形式を開拓できるでしょう。長期的には、単なるコンテンツ制作者としてだけでなく、業界や社会に対して新たな視点や価値観を提示する思想的リーダーとしての役割も期待されます。`
-          },
-          specialties: topTags.length > 0 ? topTags : ['クリエイティブ制作', 'コンテンツ開発', 'デザイン'],
-          interests: {
-            areas: interestAreas.length > 0 ? interestAreas : ['クリエイティブ', 'デジタルメディア', 'コンテンツ'],
-            topics: allTags.slice(5, 8)
-          },
-          design_styles: ['モダン', 'クリーン', 'ミニマリスト'],
-          tag_frequency: tagFrequency
-        }
-      };
-    } catch (error) {
-      console.error('直接分析中にエラーが発生:', error);
-      return {
-        success: false,
-        error: '分析処理中にエラーが発生しました。'
-      };
+    if (profileId) {
+      document.title = userProfile ? `${userProfile.full_name || 'User'} | Balubo` : 'プロフィール | Balubo';
+    } else {
+      // 自分のマイページの場合
+      document.title = 'マイページ | Balubo';
+      console.log('📌 自分のマイページを表示します');
     }
-  };
+    
+    // URLをチェック
+    console.log('📌 現在のURL:', window.location.href);
+    console.log('📌 ログイン後の処理です');
+    
+    // ログイン状態の確認（デバッグ用）
+    const checkLoginStatus = async () => {
+      const { data } = await supabase.auth.getSession();
+      console.log('📊 ログイン状態:', data.session ? 'ログイン済み' : 'ログインしていません');
+      if (data.session) {
+        console.log('🔑 ユーザーID:', data.session.user.id);
+      }
+    };
+    
+    checkLoginStatus();
+    
+    return () => {
+      // クリーンアップ関数
+    };
+  }, [params.id, userProfile]);
 
   return (
     <div className="min-h-screen bg-gray-50">

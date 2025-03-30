@@ -5,6 +5,49 @@ import App from './App.tsx';
 import './index.css';
 import { resetAuthState } from './lib/supabase.ts';
 
+// デバッグ情報表示用のスタイルとボタンを追加
+const debugStyle = document.createElement('style');
+debugStyle.textContent = `
+  #debug-button {
+    position: fixed;
+    bottom: 20px;
+    right: 20px;
+    background-color: rgba(79, 70, 229, 0.9);
+    color: white;
+    border: none;
+    border-radius: 50%;
+    width: 40px;
+    height: 40px;
+    font-size: 16px;
+    cursor: pointer;
+    z-index: 9999;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+  }
+  #debug-button:hover {
+    background-color: rgba(79, 70, 229, 1);
+  }
+`;
+document.head.appendChild(debugStyle);
+
+// デバッグボタンを追加（開発環境でのみ表示）
+if (import.meta.env.DEV) {
+  const debugButton = document.createElement('button');
+  debugButton.id = 'debug-button';
+  debugButton.textContent = '?';
+  debugButton.title = 'デバッグ情報を表示';
+  debugButton.onclick = () => {
+    try {
+      const debugInfo = localStorage.getItem('auth_debug_info');
+      alert(debugInfo ? `デバッグ情報:\n${JSON.stringify(JSON.parse(debugInfo), null, 2)}` : 'デバッグ情報なし');
+    } catch (e) {
+      alert('デバッグ情報の取得に失敗しました: ' + (e instanceof Error ? e.message : String(e)));
+    }
+  };
+  document.body.appendChild(debugButton);
+}
+
 // エラーハンドリングコンポーネント
 const ErrorBoundary = ({ children }: { children: React.ReactNode }) => {
   const [hasError, setHasError] = useState(false);
@@ -89,6 +132,45 @@ const ErrorBoundary = ({ children }: { children: React.ReactNode }) => {
       window.removeEventListener('error', errorHandler);
       window.removeEventListener('unhandledrejection', unhandledRejectionHandler);
     };
+  }, []);
+
+  // 追加: ルートへのリダイレクト回避
+  useEffect(() => {
+    // リダイレクトループ検出
+    let redirectCount = parseInt(sessionStorage.getItem('redirect_count') || '0');
+    const currentPath = window.location.pathname;
+    
+    // callbackページの場合はカウントをリセット
+    if (currentPath.includes('/callback') || currentPath.includes('/auth/callback')) {
+      sessionStorage.setItem('redirect_count', '0');
+      return;
+    }
+    
+    // リダイレクト回数をカウント
+    if (currentPath === '/') {
+      redirectCount++;
+      sessionStorage.setItem('redirect_count', redirectCount.toString());
+      
+      // 閾値を超えるリダイレクトを検出した場合
+      if (redirectCount > 3) {
+        console.error('リダイレクトループを検出しました');
+        
+        try {
+          // デバッグ情報を保存
+          const debugInfo = JSON.parse(localStorage.getItem('auth_debug_info') || '{"steps":[]}');
+          debugInfo.steps.push(`[System] リダイレクトループ検出 (${redirectCount}回)`);
+          localStorage.setItem('auth_debug_info', JSON.stringify(debugInfo));
+        } catch (e) {
+          console.error('デバッグ情報の保存に失敗しました:', e);
+        }
+        
+        // 明示的にマイページに強制リダイレクト（最終手段）
+        if (redirectCount > 5) {
+          sessionStorage.removeItem('redirect_count');  // カウントをリセット
+          window.location.href = '/mypage';
+        }
+      }
+    }
   }, []);
 
   if (hasError) {

@@ -40,18 +40,18 @@ function LandingPage() {
         <div className="mx-auto max-w-7xl px-4 sm:px-6 lg:px-8">
           <div className="flex justify-between h-16 items-center">
             <div className="flex-shrink-0">
-              <span className="text-2xl font-bold text-indigo-600">Balubo</span>
+              <span className="text-2xl font-bold text-indigo-500">Balubo</span>
             </div>
             <div className="flex items-center space-x-4">
               <button
                 onClick={() => navigate('/login')}
-                className="text-gray-700 hover:text-indigo-600 px-3 py-2 rounded-md text-sm font-medium"
+                className="text-gray-700 hover:text-indigo-500 px-3 py-2 rounded-md text-sm font-medium"
               >
                 ログイン
               </button>
               <button
                 onClick={() => navigate('/signup')}
-                className="bg-indigo-600 hover:bg-indigo-500 text-white px-4 py-2 rounded-md text-sm font-medium"
+                className="bg-indigo-500 hover:bg-indigo-400 text-white px-4 py-2 rounded-md text-sm font-medium"
               >
                 無料で始める
               </button>
@@ -64,19 +64,19 @@ function LandingPage() {
       <header className="container mx-auto px-4 py-16 sm:px-6 lg:px-8">
         <div className="text-center">
           <h1 className="text-4xl font-bold tracking-tight text-gray-900 sm:text-6xl">
-            <span className="text-indigo-600">AIが</span>作品の新しい魅力を<span className="text-indigo-600">発見・証明</span>
+            <span className="text-indigo-500">AIが</span>クリエイターの新しい魅力を<span className="text-indigo-500">発見・証明</span>
             <span className="block mt-2">ミスマッチのない最適な仕事と出会う</span>
           </h1>
           <p className="mt-6 text-lg leading-8 text-gray-600">
-            Baluboは<span className="text-indigo-600">「AIによる作品分析」</span>を通じて、<br />
-            クリエイターの<span className="text-indigo-600">魅力を客観的に発見・証明</span>するポートフォリオサービスです。<br />
+            Baluboは<span className="text-indigo-500">「AIによる作品分析」</span>を通じて、<br />
+            クリエイターの<span className="text-indigo-500">魅力を客観的に発見・証明</span>するポートフォリオサービスです。<br />
             ポートフォリオに「客観性」をもたらすことで、<br />
             クリエイターと発注者のミスマッチを解決することを目指します。
           </p>
           <div className="mt-10 flex items-center justify-center gap-x-6">
             <button
               onClick={() => navigate('/signup')}
-              className="rounded-md bg-indigo-600 px-6 py-3 text-lg font-semibold text-white shadow-sm hover:bg-indigo-500 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-indigo-600 flex items-center gap-2"
+              className="rounded-md bg-indigo-500 px-6 py-3 text-lg font-semibold text-white shadow-sm hover:bg-indigo-400 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-indigo-500 flex items-center gap-2"
             >
               無料で始める <ArrowRight className="w-5 h-5" />
             </button>
@@ -99,7 +99,7 @@ function LandingPage() {
           <div className="grid grid-cols-1 gap-8 md:grid-cols-2 lg:gap-12">
             {/* クリエイターの悩み */}
             <div className="bg-white p-6 rounded-lg shadow-md">
-              <h3 className="text-xl font-semibold mb-4 flex items-center text-indigo-700">
+              <h3 className="text-xl font-semibold mb-4 flex items-center text-indigo-500">
                 <PenTool className="h-6 w-6 mr-2" />
                 クリエイターの悩み
               </h3>
@@ -125,7 +125,7 @@ function LandingPage() {
             
             {/* 発注者の悩み */}
             <div className="bg-white p-6 rounded-lg shadow-md">
-              <h3 className="text-xl font-semibold mb-4 flex items-center text-indigo-700">
+              <h3 className="text-xl font-semibold mb-4 flex items-center text-indigo-500">
                 <Users className="h-6 w-6 mr-2" />
                 発注者の悩み
               </h3>
@@ -157,7 +157,7 @@ function LandingPage() {
         <div className="mx-auto max-w-7xl px-6 lg:px-8">
           <div className="mx-auto max-w-2xl text-center mb-12">
             <h2 className="text-3xl font-bold tracking-tight text-gray-900 sm:text-4xl">
-              その悩み、<span className="text-indigo-600">Balubo</span>がAIで解決します
+              その悩み、<span className="text-indigo-500">Balubo</span>がAIで解決します
             </h2>
             <p className="mt-6 text-lg leading-8 text-gray-600">
               AI分析型ポートフォリオサービス「Balubo」は、<br />
@@ -169,7 +169,7 @@ function LandingPage() {
             <dl className="grid max-w-xl grid-cols-1 gap-x-8 gap-y-16 lg:max-w-none lg:grid-cols-3">
               <div className="flex flex-col">
                 <dt className="flex items-center gap-x-3 text-xl font-semibold leading-7 text-gray-900">
-                  <Zap className="h-6 w-6 flex-none text-indigo-600" aria-hidden="true" />
+                  <Zap className="h-6 w-6 flex-none text-indigo-500" aria-hidden="true" />
                   ポートフォリオ自動生成
                 </dt>
                 <dd className="mt-4 flex flex-auto flex-col text-base leading-7 text-gray-600">
@@ -180,7 +180,7 @@ function LandingPage() {
               </div>
               <div className="flex flex-col">
                 <dt className="flex items-center gap-x-3 text-xl font-semibold leading-7 text-gray-900">
-                  <BrainCircuit className="h-6 w-6 flex-none text-indigo-600" aria-hidden="true" />
+                  <BrainCircuit className="h-6 w-6 flex-none text-indigo-500" aria-hidden="true" />
                   AIによる客観的分析
                 </dt>
                 <dd className="mt-4 flex flex-auto flex-col text-base leading-7 text-gray-600">
@@ -191,7 +191,7 @@ function LandingPage() {
               </div>
               <div className="flex flex-col">
                 <dt className="flex items-center gap-x-3 text-xl font-semibold leading-7 text-gray-900">
-                  <Target className="h-6 w-6 flex-none text-indigo-600" aria-hidden="true" />
+                  <Target className="h-6 w-6 flex-none text-indigo-500" aria-hidden="true" />
                   ミスマッチの解消
                 </dt>
                 <dd className="mt-4 flex flex-auto flex-col text-base leading-7 text-gray-600">
@@ -210,7 +210,7 @@ function LandingPage() {
         <div className="mx-auto max-w-7xl px-6 lg:px-8">
           <div className="mx-auto max-w-2xl text-center">
             <h2 className="text-3xl font-bold tracking-tight text-gray-900 sm:text-4xl">
-              AIがあなたの作品を<span className="text-indigo-600">多角的に分析</span>
+              AIがあなたの作品を<span className="text-indigo-500">多角的に分析</span>
             </h2>
             <p className="mt-6 text-lg leading-8 text-gray-600">
               クリエイターの価値を測る要素は多様ですが、Baluboでは特に重要な3つの要素を分析。<br />
@@ -221,9 +221,9 @@ function LandingPage() {
             <dl className="grid max-w-xl grid-cols-1 gap-x-8 gap-y-16 lg:max-w-none lg:grid-cols-3">
               <div className="flex flex-col">
                 <dt className="flex items-center gap-x-3 text-xl font-semibold leading-7 text-gray-900">
-                  <Sparkles className="h-6 w-6 flex-none text-indigo-600" aria-hidden="true" />
+                  <Sparkles className="h-6 w-6 flex-none text-indigo-500" aria-hidden="true" />
                   創造性と独自性
-                  <span className="text-indigo-600 ml-1 text-sm">(オリジナリティ)</span>
+                  <span className="text-indigo-500 ml-1 text-sm">(オリジナリティ)</span>
                 </dt>
                 <dd className="mt-4 flex flex-auto flex-col text-base leading-7 text-gray-600">
                   <p className="flex-auto">
@@ -233,9 +233,9 @@ function LandingPage() {
               </div>
               <div className="flex flex-col">
                 <dt className="flex items-center gap-x-3 text-xl font-semibold leading-7 text-gray-900">
-                  <FileText className="h-6 w-6 flex-none text-indigo-600" aria-hidden="true" />
+                  <FileText className="h-6 w-6 flex-none text-indigo-500" aria-hidden="true" />
                   専門性とスキル
-                  <span className="text-indigo-600 ml-1 text-sm">(クオリティ)</span>
+                  <span className="text-indigo-500 ml-1 text-sm">(クオリティ)</span>
                 </dt>
                 <dd className="mt-4 flex flex-auto flex-col text-base leading-7 text-gray-600">
                   <p className="flex-auto">
@@ -245,9 +245,9 @@ function LandingPage() {
               </div>
               <div className="flex flex-col">
                 <dt className="flex items-center gap-x-3 text-xl font-semibold leading-7 text-gray-900">
-                  <LineChart className="h-6 w-6 flex-none text-indigo-600" aria-hidden="true" />
+                  <LineChart className="h-6 w-6 flex-none text-indigo-500" aria-hidden="true" />
                   影響力と共感
-                  <span className="text-indigo-600 ml-1 text-sm">(エンゲージメント)</span>
+                  <span className="text-indigo-500 ml-1 text-sm">(エンゲージメント)</span>
                 </dt>
                 <dd className="mt-4 flex flex-auto flex-col text-base leading-7 text-gray-600">
                   <p className="flex-auto">
@@ -277,7 +277,7 @@ function LandingPage() {
             <div className="mt-10 flex items-center justify-center gap-x-6">
               <button
                 onClick={() => navigate('/signup')}
-                className="rounded-md bg-indigo-600 px-6 py-3 text-lg font-semibold text-white shadow-sm hover:bg-indigo-500 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-indigo-600 flex items-center gap-2"
+                className="rounded-md bg-indigo-500 px-6 py-3 text-lg font-semibold text-white shadow-sm hover:bg-indigo-400 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-indigo-500 flex items-center gap-2"
               >
                 無料で始める <ArrowRight className="w-5 h-5" />
               </button>
@@ -302,7 +302,7 @@ function LandingPage() {
             <div className="bg-white p-6 rounded-lg shadow-md text-center relative">
               <div className="absolute -top-4 -left-4 w-10 h-10 bg-indigo-600 rounded-full flex items-center justify-center text-white font-bold">1</div>
               <div className="flex justify-center mb-4">
-                <Users className="h-12 w-12 text-indigo-600" />
+                <Users className="h-12 w-12 text-indigo-500" />
               </div>
               <h3 className="text-xl font-semibold mb-2">アカウント作成</h3>
               <p className="text-gray-600">
@@ -313,7 +313,7 @@ function LandingPage() {
             <div className="bg-white p-6 rounded-lg shadow-md text-center relative">
               <div className="absolute -top-4 -left-4 w-10 h-10 bg-indigo-600 rounded-full flex items-center justify-center text-white font-bold">2</div>
               <div className="flex justify-center mb-4">
-                <FileText className="h-12 w-12 text-indigo-600" />
+                <FileText className="h-12 w-12 text-indigo-500" />
               </div>
               <h3 className="text-xl font-semibold mb-2">作品URL入力</h3>
               <p className="text-gray-600">
@@ -322,9 +322,9 @@ function LandingPage() {
             </div>
             
             <div className="bg-white p-6 rounded-lg shadow-md text-center relative">
-              <div className="absolute -top-4 -left-4 w-10 h-10 bg-indigo-600 rounded-full flex items-center justify-center text-white font-bold">3</div>
+              <div className="absolute -top-4 -left-4 w-10 h-10 bg-indigo-500 rounded-full flex items-center justify-center text-white font-bold">3</div>
               <div className="flex justify-center mb-4">
-                <Zap className="h-12 w-12 text-indigo-600" />
+                <Zap className="h-12 w-12 text-indigo-500" />
               </div>
               <h3 className="text-xl font-semibold mb-2">AI分析実行</h3>
               <p className="text-gray-600">
@@ -352,7 +352,7 @@ function LandingPage() {
               <div className="bg-white p-6 rounded-lg shadow-sm">
                 <div className="flex items-center justify-between cursor-pointer">
                   <h3 className="text-lg font-semibold flex items-center">
-                    <HelpCircle className="h-5 w-5 text-indigo-600 mr-2" />
+                    <HelpCircle className="h-5 w-5 text-indigo-500 mr-2" />
                     どんなクリエイターにおすすめですか？
                   </h3>
                   <ChevronDown className="h-5 w-5 text-gray-500" />
@@ -365,7 +365,7 @@ function LandingPage() {
               <div className="bg-white p-6 rounded-lg shadow-sm">
                 <div className="flex items-center justify-between cursor-pointer">
                   <h3 className="text-lg font-semibold flex items-center">
-                    <HelpCircle className="h-5 w-5 text-indigo-600 mr-2" />
+                    <HelpCircle className="h-5 w-5 text-indigo-500 mr-2" />
                     無料プランでどこまでできますか？
                   </h3>
                   <ChevronDown className="h-5 w-5 text-gray-500" />
@@ -378,7 +378,7 @@ function LandingPage() {
               <div className="bg-white p-6 rounded-lg shadow-sm">
                 <div className="flex items-center justify-between cursor-pointer">
                   <h3 className="text-lg font-semibold flex items-center">
-                    <HelpCircle className="h-5 w-5 text-indigo-600 mr-2" />
+                    <HelpCircle className="h-5 w-5 text-indigo-500 mr-2" />
                     AIはどのように分析するのですか？
                   </h3>
                   <ChevronDown className="h-5 w-5 text-gray-500" />
@@ -391,7 +391,7 @@ function LandingPage() {
               <div className="bg-white p-6 rounded-lg shadow-sm">
                 <div className="flex items-center justify-between cursor-pointer">
                   <h3 className="text-lg font-semibold flex items-center">
-                    <HelpCircle className="h-5 w-5 text-indigo-600 mr-2" />
+                    <HelpCircle className="h-5 w-5 text-indigo-500 mr-2" />
                     自己PRにどう役立ちますか？
                   </h3>
                   <ChevronDown className="h-5 w-5 text-gray-500" />
@@ -419,13 +419,13 @@ function LandingPage() {
             <div className="mt-10 flex items-center justify-center gap-x-6">
               <button
                 onClick={() => navigate('/signup')}
-                className="rounded-md bg-indigo-600 px-8 py-4 text-lg font-semibold text-white shadow-md hover:bg-indigo-500 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-indigo-600 flex items-center gap-2 transition-all duration-300 hover:scale-105"
+                className="rounded-md bg-indigo-500 px-8 py-4 text-lg font-semibold text-white shadow-md hover:bg-indigo-400 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-indigo-500 flex items-center gap-2 transition-all duration-300 hover:scale-105"
               >
                 無料でBaluboを始める <ArrowRight className="w-5 h-5" />
               </button>
             </div>
             <p className="mt-6 text-sm text-gray-500">
-              感想・お問い合わせは「<a href="https://docs.google.com/spreadsheets/d/1nfcbO8H1DkpfYocAIQmoAWTGpPwJe_Etj-vWw9RvT-Y/edit?gid=0#gid=0" target="_blank" rel="noopener noreferrer" className="text-indigo-600 hover:underline">baluboのぼやきBOX</a>」まで
+              感想・お問い合わせは「baluboのぼやきBOX」まで
             </p>
           </div>
         </div>
@@ -435,7 +435,7 @@ function LandingPage() {
       <footer className="bg-white py-12 border-t border-gray-200">
         <div className="mx-auto max-w-7xl px-6 lg:px-8">
           <div className="flex flex-col items-center justify-center">
-            <div className="text-2xl font-bold text-indigo-600 mb-4">Balubo</div>
+            <div className="text-2xl font-bold text-indigo-500 mb-4">Balubo</div>
             <div className="text-sm text-gray-500 mb-6">
               AI分析型ポートフォリオサービス
             </div>
@@ -562,6 +562,11 @@ function App() {
   return (
     <ToastProvider>
       <Routes>
+        {/* 認証コールバックルートを最優先で処理 */}
+        <Route path="/auth/callback" element={<AuthCallback />} />
+        <Route path="/callback" element={<AuthCallback />} />
+        
+        {/* 通常のルート */}
         <Route path="/" element={<LandingPage />} />
         <Route path="/signup" element={<SignUpForm />} />
         <Route path="/login" element={<LoginForm />} />
@@ -574,7 +579,6 @@ function App() {
         <Route path="/profile/:id" element={<Profile />} />
         <Route path="/profile/edit" element={<ProfileEdit />} />
         <Route path="/settings" element={<Settings />} />
-        <Route path="/auth/callback" element={<AuthCallback />} />
         {/* テスト用ルートはコメントアウト */}
         {/* <Route path="/ogp-test" element={<OgpTest />} />
         <Route path="/gemini-test" element={<GeminiUrlTest />} /> */}

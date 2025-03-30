@@ -1,114 +1,82 @@
-import { useEffect, useState } from 'react';
+import { useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { supabase } from '../lib/supabase';
+import { supabase } from '../../lib/supabase';
+import { useToast } from '../../lib/hooks/useToast';
 
-export function AuthCallback() {
+export default function AuthCallback() {
   const navigate = useNavigate();
-  const [error, setError] = useState<string | null>(null);
-  const [loading, setLoading] = useState(true);
+  const toast = useToast();
 
   useEffect(() => {
-    const handleAuthCallback = async () => {
+    // コールバック処理を非同期で実行
+    const handleCallback = async () => {
+      console.log('🌟 Auth Callbackが初期化されました', window.location.href);
+      
       try {
-        // URLからハッシュフラグメントを取得
-        const hashParams = new URLSearchParams(window.location.hash.substring(1));
-        const accessToken = hashParams.get('access_token');
-        const refreshToken = hashParams.get('refresh_token');
-
-        if (accessToken && refreshToken) {
-          // セッションを設定
-          const { error } = await supabase.auth.setSession({
-            access_token: accessToken,
-            refresh_token: refreshToken
+        // ローカルストレージからリダイレクト先を取得
+        const redirectTo = localStorage.getItem('redirect_after_login') || '/mypage';
+        console.log('📌 リダイレクト先:', redirectTo);
+        
+        // セッションを取得して確認
+        const { data, error } = await supabase.auth.getSession();
+        
+        if (error) {
+          console.error('🔴 認証セッション取得エラー:', error.message);
+          toast.error({
+            title: "認証に失敗しました",
+            description: error.message
           });
-
-          if (error) throw error;
-
-          // ユーザー情報を取得
-          const { data: { user }, error: userError } = await supabase.auth.getUser();
-          
-          if (userError) throw userError;
-          
-          if (user) {
-            // プロフィールレコードが存在するか確認
-            try {
-              const { error: profileError } = await supabase
-                .from('profiles')
-                .select('*')
-                .eq('id', user.id)
-                .single();
-
-              // プロフィールが存在しない場合は作成
-              if (profileError && profileError.code === 'PGRST116') {
-                // デフォルト値を設定
-                const defaultUsername = user.email ? user.email.split('@')[0] : `user_${Date.now()}`;
-                const defaultDisplayName = user.user_metadata?.full_name || defaultUsername;
-                
-                try {
-                  await supabase.from('profiles').insert({
-                    id: user.id,
-                    username: defaultUsername,
-                    display_name: defaultDisplayName,
-                    email: user.email,
-                    avatar_url: user.user_metadata?.avatar_url || null,
-                    bio: '',
-                    website: '',
-                    location: '',
-                    skills: []
-                  });
-                } catch (insertError) {
-                  console.error('プロフィール作成エラー:', insertError);
-                  // RLSポリシー違反の場合はクライアント側で対応
-                }
-              }
-            } catch (err) {
-              console.error('プロフィール確認エラー:', err);
-              // エラーがあっても認証自体は成功しているので続行
-            }
-
-            // ダッシュボードにリダイレクト
-            navigate('/mypage');
-          } else {
-            setError('ユーザー情報の取得に失敗しました');
-          }
-        } else {
-          setError('認証情報の取得に失敗しました');
+          navigate('/login', { replace: true });
+          return;
         }
-      } catch (err) {
-        console.error('認証コールバックエラー:', err);
-        setError(err instanceof Error ? err.message : '認証処理中にエラーが発生しました');
-      } finally {
-        setLoading(false);
+        
+        if (!data.session) {
+          console.warn('⚠️ 認証セッションがありません');
+          toast.error({
+            title: "認証セッションがありません",
+            description: "再度ログインしてください"
+          });
+          navigate('/login', { replace: true });
+          return;
+        }
+        
+        // セッションが確認できたら、成功通知
+        console.log('✅ 認証成功！ユーザーID:', data.session.user.id);
+        toast({
+          title: "ログインに成功しました",
+        });
+        
+        // リダイレクト先に移動
+        console.log('🚀 リダイレクト先へ移動します:', redirectTo);
+        localStorage.removeItem('redirect_after_login'); // クリーンアップ
+        navigate(redirectTo, { replace: true });
+      } catch (error) {
+        console.error('🔴 認証コールバック処理エラー:', error);
+        toast.error({
+          title: "認証処理中にエラーが発生しました",
+          description: error instanceof Error ? error.message : '不明なエラー'
+        });
+        navigate('/login', { replace: true });
       }
     };
 
-    handleAuthCallback();
-  }, [navigate]);
+    // コールバック処理を実行
+    handleCallback();
+  }, [navigate, toast]);
 
   return (
-    <div className="min-h-screen bg-gray-50 flex flex-col justify-center items-center p-4">
-      {loading ? (
+    <div className="flex min-h-screen flex-col items-center justify-center bg-gray-50 p-4">
+      <div className="w-full max-w-md space-y-8 rounded-lg bg-white p-8 shadow-md">
         <div className="text-center">
-          <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-indigo-600 mx-auto"></div>
-          <p className="mt-4 text-lg text-gray-700">認証処理中...</p>
+          <h2 className="mt-6 text-3xl font-bold tracking-tight text-gray-900">認証処理中...</h2>
+          <p className="mt-2 text-sm text-gray-600">
+            ログイン情報を処理しています。しばらくお待ちください。
+          </p>
         </div>
-      ) : error ? (
-        <div className="max-w-md w-full bg-white p-8 rounded-lg shadow-md">
-          <h2 className="text-2xl font-bold text-red-600 mb-4">エラーが発生しました</h2>
-          <p className="text-gray-700 mb-6">{error}</p>
-          <button
-            onClick={() => navigate('/login')}
-            className="w-full bg-indigo-600 text-white py-2 px-4 rounded hover:bg-indigo-700 transition-colors"
-          >
-            ログインページに戻る
-          </button>
+        <div className="flex justify-center pt-4">
+          <div className="h-8 w-8 animate-spin rounded-full border-b-2 border-t-2 border-blue-500"></div>
         </div>
-      ) : (
-        <div className="max-w-md w-full bg-white p-8 rounded-lg shadow-md">
-          <h2 className="text-2xl font-bold text-green-600 mb-4">認証成功</h2>
-          <p className="text-gray-700 mb-6">リダイレクト中...</p>
-        </div>
-      )}
+      </div>
     </div>
   );
 }

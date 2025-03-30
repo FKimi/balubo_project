@@ -170,4 +170,4 @@ my-next-app/
 5. **デプロイ管理**
    - Netlifyへのデプロイフロー遵守
    - Netlify Functionsを活用したCORSプロキシの維持
-   - デプロイURL: https://stupendous-llama-975208.netlify.app/
+   - デプロイURL: https://balubo.netlify.app/ ※デプロイはgithub actionsで行う。修正しないで。

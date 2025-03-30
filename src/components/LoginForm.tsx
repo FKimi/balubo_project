@@ -38,18 +38,85 @@ export function LoginForm() {
     setError(null);
     
     try {
-      const { error } = await supabase.auth.signInWithOAuth({
+      // デバッグ情報をクリア
+      localStorage.removeItem('auth_debug_info');
+      
+      // デバッグトレースを開始
+      const debugInfo = {
+        startTime: new Date().toISOString(),
+        steps: ['ログイン開始']
+      };
+      localStorage.setItem('auth_debug_info', JSON.stringify(debugInfo));
+      
+      // ログイン後のリダイレクト先をlocalStorageに保存（Supabaseのストレージキーにも注意）
+      const redirectPath = '/mypage';
+      localStorage.setItem('redirect_after_login', redirectPath);
+      localStorage.setItem('supabase.auth.callbackUrl', redirectPath);
+      
+      // デバッグ情報を更新
+      debugInfo.steps.push(`リダイレクト先設定: ${redirectPath}`);
+      localStorage.setItem('auth_debug_info', JSON.stringify(debugInfo));
+      
+      // コールバックURLを設定（絶対パスで指定）
+      const callbackUrl = `${window.location.origin}/auth/callback`;
+      debugInfo.steps.push(`コールバックURL設定: ${callbackUrl}`);
+      localStorage.setItem('auth_debug_info', JSON.stringify(debugInfo));
+      
+      // セッションをクリアしてから新しいログインを開始
+      await supabase.auth.signOut();
+      debugInfo.steps.push('既存セッションをクリア');
+      localStorage.setItem('auth_debug_info', JSON.stringify(debugInfo));
+      
+      // Google OAuth認証を実行
+      const { data, error } = await supabase.auth.signInWithOAuth({
         provider: 'google',
         options: {
-          redirectTo: `${window.location.origin}/auth/callback?redirectFrom=/mypage`,
+          redirectTo: callbackUrl,
+          queryParams: {
+            access_type: 'offline',
+            prompt: 'consent',
+          },
+          skipBrowserRedirect: false // ブラウザリダイレクトを確実に実行する
         },
       });
       
-      if (error) throw error;
+      // デバッグ情報を更新
+      if (data?.url) {
+        debugInfo.steps.push(`OAuth成功: ${data.url.substring(0, 50)}...`);
+      } else {
+        debugInfo.steps.push('OAuth結果URLなし');
+      }
+      localStorage.setItem('auth_debug_info', JSON.stringify(debugInfo));
       
-      // Google認証はリダイレクトするため、ここではnavigateは不要
-      // 認証後はAuthCallbackコンポーネントで指定したリダイレクト先に自動的にリダイレクトされます
+      if (error) {
+        debugInfo.steps.push(`OAuth失敗: ${error.message}`);
+        localStorage.setItem('auth_debug_info', JSON.stringify(debugInfo));
+        throw error;
+      }
+      
+      if (data?.url) {
+        debugInfo.steps.push('リダイレクト開始');
+        localStorage.setItem('auth_debug_info', JSON.stringify(debugInfo));
+        
+        // 直接URLにリダイレクト
+        window.location.href = data.url;
+      } else {
+        debugInfo.steps.push('リダイレクトURL取得失敗');
+        localStorage.setItem('auth_debug_info', JSON.stringify(debugInfo));
+        throw new Error('認証URLが取得できませんでした');
+      }
     } catch (err) {
+      // エラー情報も保存
+      try {
+        const debugInfo = JSON.parse(localStorage.getItem('auth_debug_info') || '{"steps":[]}');
+        debugInfo.steps.push(`エラー発生: ${err instanceof Error ? err.message : String(err)}`);
+        debugInfo.error = err instanceof Error ? err.message : String(err);
+        localStorage.setItem('auth_debug_info', JSON.stringify(debugInfo));
+      } catch (e) {
+        console.error('デバッグ情報保存エラー:', e);
+      }
+      
+      localStorage.removeItem('redirect_after_login');
       setError(err instanceof Error ? err.message : 'Googleログイン中にエラーが発生しました');
       setGoogleLoading(false);
     }
