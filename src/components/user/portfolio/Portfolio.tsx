@@ -17,7 +17,6 @@ import AiAnalysisTab from './AiAnalysisTab'; // AI分析タブコンポーネン
 import CareerSection from './CareerSection'; // キャリアセクションコンポーネント
 import { AiAnalysis } from './AiAnalysisTab'; // タイプをインポート
 import CareerEditInline from './CareerEditInline'; // 追加: キャリア編集用コンポーネント
-import UserSidebar from '../UserSidebar'; // ユーザーサイドバーをインポート
 
 // Career型の定義（CareerEditInlineと共通）
 type Career = {
@@ -44,7 +43,7 @@ const Portfolio: FC = () => {
   const [featuredWorks, setFeaturedWorks] = useState<Work[]>([]);
   
   // サイドバーの状態管理
-  const [isSidebarOpen, setIsSidebarOpen] = useState(false);
+  // const [isSidebarOpen, setIsSidebarOpen] = useState(false);
 
   // --- AI分析関連の状態 ---
   const [isAiAnalysisEmpty, setIsAiAnalysisEmpty] = useState(true);
@@ -1185,7 +1184,7 @@ const Portfolio: FC = () => {
   return (
     <div className="bg-gray-50 min-h-screen">
       {/* サイドバー */}
-      <UserSidebar isOpen={isSidebarOpen} onClose={() => setIsSidebarOpen(false)} />
+      {/* UserSidebar isOpen={isSidebarOpen} onClose={() => setIsSidebarOpen(false)} /> */}
 
       <div className="max-w-7xl mx-auto px-4 py-8">
         {/* トップセクション */}
