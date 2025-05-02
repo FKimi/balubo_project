@@ -1,0 +1,21 @@
+# balubo - ポートフォリオ作成サービス
+
+<!doctype html>
+<html lang="ja">
+  <head>
+    <meta charset="UTF-8" />
+    <link rel="icon" type="image/svg+xml" href="/vite.svg" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>balubo - ポートフォリオ作成サービス</title>
+    <link href="https://fonts.googleapis.com/css2?family=Noto+Sans+JP:wght@400;500;700&display=swap" rel="stylesheet">
+    <meta name="description" content="baluboは、あなたの作品をAIが分析し、魅力的なポートフォリオを作成するサービスです。">
+    <script type="module" crossorigin src="/assets/index-DLag2fnK.js"></script>
+    <link rel="modulepreload" crossorigin href="/assets/vendor-DLvDI6FV.js">
+    <link rel="modulepreload" crossorigin href="/assets/supabase-CcgAUdvC.js">
+    <link rel="modulepreload" crossorigin href="/assets/ui-CvfxnLCf.js">
+    <link rel="stylesheet" crossorigin href="/assets/index-DO_dEAQQ.css">
+  </head>
+  <body>
+    <div id="root"></div>
+  </body>
+</html>

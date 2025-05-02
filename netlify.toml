@@ -1,0 +1,84 @@
+[build]
+  command = "npm run build"
+  publish = "dist"
+  functions = "netlify/functions"
+
+[dev]
+  command = "npm run dev"
+  port = 8888
+  targetPort = 5173
+  publish = "dist"
+  framework = "vite"
+  autoLaunch = true
+  
+[functions]
+  node_bundler = "esbuild"
+  external_node_modules = ["@sparticuz/chromium", "puppeteer-core"]
+
+# ビルド時の環境変数（必要に応じてキーを.envから移行するか、Netlify UIで設定）
+[build.environment]
+  PUPPETEER_SKIP_CHROMIUM_DOWNLOAD = "true"
+  NETLIFY_NEXT_PLUGIN_SKIP = "true"
+
+# 認証エラーのリダイレクト設定
+[[redirects]]
+  from = "/auth-error"
+  to = "/public/error.html"
+  status = 200
+  force = true
+
+# API エンドポイントリダイレクト
+[[redirects]]
+  from = "/api/*"
+  to = "/.netlify/functions/:splat"
+  status = 200
+  force = true
+
+# SPA の標準リダイレクト
+[[redirects]]
+  from = "/*"
+  to = "/index.html"
+  status = 200
+
+[[edge_functions]]
+  path = "/api/ogp"
+  function = "fetch-url"
+
+# Puppeteerを使用したスクレイピング機能のためのヘッダー設定
+[[headers]]
+  for = "/.netlify/functions/scrape-url"
+  [headers.values]
+    Access-Control-Allow-Origin = "*"
+    Access-Control-Allow-Methods = "GET, POST, OPTIONS"
+    Access-Control-Allow-Headers = "Content-Type, Authorization"
+
+[[headers]]
+  for = "/api/ogp"
+  [headers.values]
+    Access-Control-Allow-Origin = "*"
+    Access-Control-Allow-Methods = "GET, POST, OPTIONS"
+    Access-Control-Allow-Headers = "Content-Type, Authorization"
+
+# タグ作成APIのヘッダー設定
+[[headers]]
+  for = "/.netlify/functions/create-tag"
+  [headers.values]
+    Access-Control-Allow-Origin = "*"
+    Access-Control-Allow-Methods = "GET, POST, OPTIONS"
+    Access-Control-Allow-Headers = "Content-Type, Authorization"
+
+# タグ分析保存APIのヘッダー設定
+[[headers]]
+  for = "/.netlify/functions/save-tag-analytics"
+  [headers.values]
+    Access-Control-Allow-Origin = "*"
+    Access-Control-Allow-Methods = "GET, POST, OPTIONS"
+    Access-Control-Allow-Headers = "Content-Type, Authorization"
+
+# ユーザーインサイト保存APIのヘッダー設定
+[[headers]]
+  for = "/.netlify/functions/save-user-insights"
+  [headers.values]
+    Access-Control-Allow-Origin = "*"
+    Access-Control-Allow-Methods = "GET, POST, OPTIONS"
+    Access-Control-Allow-Headers = "Content-Type, Authorization"
