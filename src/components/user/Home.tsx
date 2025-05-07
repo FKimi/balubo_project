@@ -1,5 +1,4 @@
-import * as React from 'react';
-import { useState, useCallback } from 'react';
+import React, { useState, useCallback, FC } from 'react';
 import { supabase } from '../../lib/supabase';
 import { useNavigate } from 'react-router-dom';
 import { Heart, MessageSquare, Plus } from 'lucide-react';
@@ -51,7 +50,7 @@ export interface UserType {
   headline: string;
 }
 
-const Home: React.FC = () => {
+const Home: FC = () => {
   const [works, setWorks] = useState<Work[]>([]);
   const [mutters, setMutters] = useState<Mutter[]>([]);
   const [loading, setLoading] = useState(true);
@@ -314,7 +313,7 @@ const Home: React.FC = () => {
       .single();
     if (!error && data) {
       setWorks(prev =>
-        prev.map(w => w.id === workId
+        prev.map((w: Work) => w.id === workId
           ? { ...w, ...data, user: data.profiles }
           : w
         )
@@ -374,7 +373,7 @@ const Home: React.FC = () => {
           .insert({ user_id: user.id, content_id: mutterId, content_type: 'mutter' });
         if (error) throw error;
       }
-      setMutters(prev => prev.map(m =>
+      setMutters(prev => prev.map((m: Mutter) =>
         m.id === mutterId
           ? {
               ...m,
@@ -416,7 +415,7 @@ const Home: React.FC = () => {
       if (error) throw error;
       setCommentInput('');
       await fetchComments(workId); 
-      setWorks(prev => prev.map(w => w.id === workId ? { ...w, comments: (w.comments ?? 0) + 1 } : w));
+      setWorks(prev => prev.map((w: Work) => w.id === workId ? { ...w, comments: (w.comments ?? 0) + 1 } : w));
     } catch {
       setCommentError('コメントの投稿に失敗しました');
     } finally {
@@ -450,7 +449,7 @@ const Home: React.FC = () => {
       if (error) throw error;
       setMutterCommentInput('');
       await fetchMutterComments(mutterId);
-      setMutters(prev => prev.map(m => m.id === mutterId ? { ...m, comments: (m.comments ?? 0) + 1 } : m));
+      setMutters(prev => prev.map((m: Mutter) => m.id === mutterId ? { ...m, comments: (m.comments ?? 0) + 1 } : m));
     } catch {
       setMutterCommentError('コメントの投稿に失敗しました');
     } finally {
@@ -559,7 +558,7 @@ const Home: React.FC = () => {
                   rows={2}
                   maxLength={200}
                   value={mutterInput}
-                  onChange={e => setMutterInput(e.target.value)}
+                  onChange={(e: React.ChangeEvent<HTMLTextAreaElement>) => setMutterInput(e.target.value)}
                   disabled={posting}
                 />
                 <button
@@ -587,7 +586,7 @@ const Home: React.FC = () => {
                 </div>
               ) : (
                 <div className="flex flex-col gap-6">
-                  {works.map(work => {
+                  {works.map((work: Work) => {
                     const thumb = work.thumbnailUrl || work.thumbnail_url;
                     return (
                       <div
@@ -609,7 +608,7 @@ const Home: React.FC = () => {
                           <div className="flex items-center gap-3 mb-1">
                             <div
                               className="w-10 h-10 rounded-full bg-gray-200 overflow-hidden flex-shrink-0 border-2 border-white shadow-sm transform transition-transform hover:scale-110"
-                              onClick={e => { e.stopPropagation(); if (work.user) navigate(`/profile/${work.user.id}`); }}
+                              onClick={(e: React.MouseEvent) => { e.stopPropagation(); if (work.user) navigate(`/profile/${work.user.id}`); }}
                             >
                               {work.user?.profile_image_url ? (
                                 <img src={work.user.profile_image_url} alt="avatar" className="w-full h-full object-cover" />
@@ -624,7 +623,7 @@ const Home: React.FC = () => {
                             <div className="flex flex-col">
                               <span 
                                 className="font-bold text-base sm:text-lg text-gray-900 leading-snug hover:text-indigo-600 cursor-pointer transition-colors"
-                                onClick={e => { e.stopPropagation(); if (work.user) navigate(`/profile/${work.user.id}`); }}
+                                onClick={(e: React.MouseEvent) => { e.stopPropagation(); if (work.user) navigate(`/profile/${work.user.id}`); }}
                               >
                                 {work.user?.full_name || 'ユーザー'}
                               </span>
@@ -636,7 +635,7 @@ const Home: React.FC = () => {
                           <div className="flex items-center gap-6 mt-2 text-gray-500 text-sm">
                             <button
                               className="flex items-center gap-2 focus:outline-none group transition-colors hover:text-indigo-600"
-                              onClick={e => { e.stopPropagation(); toggleLike(work.id, work.likedByMe!); }}
+                              onClick={(e: React.MouseEvent) => { e.stopPropagation(); toggleLike(work.id, work.likedByMe!); }}
                               disabled={likeLoading === work.id}
                               aria-label={work.likedByMe ? 'いいね解除' : 'いいね'}
                             >
@@ -646,7 +645,7 @@ const Home: React.FC = () => {
                             </button>
                             <button
                               className="flex items-center gap-2 focus:outline-none group relative transition-colors hover:text-indigo-600"
-                              onClick={e => { e.stopPropagation(); navigate(`/works/${work.id}`); }}
+                              onClick={(e: React.MouseEvent) => { e.stopPropagation(); navigate(`/works/${work.id}`); }}
                               aria-label="コメント一覧・投稿"
                             >
                               <MessageSquare className="w-5 h-5 text-gray-400 group-hover:scale-110 transition-transform" />
@@ -669,7 +668,7 @@ const Home: React.FC = () => {
                 </div>
               ) : (
                 <div className="flex flex-col gap-5">
-                  {mutters.map(mutter => (
+                  {mutters.map((mutter: Mutter) => (
                     <div key={mutter.id} className="bg-white rounded-2xl shadow-md border border-gray-100 flex flex-col p-5 overflow-hidden transition-all duration-300 hover:shadow-lg hover:border-indigo-200 transform hover:-translate-y-0.5">
                       <div className="flex items-center gap-3 mb-3">
                         <div className="w-10 h-10 rounded-full bg-gray-200 overflow-hidden flex-shrink-0 border-2 border-white shadow-sm">
@@ -692,7 +691,7 @@ const Home: React.FC = () => {
                       <div className="flex items-center gap-6 mt-2 text-gray-500 text-sm">
                         <button
                           className="flex items-center gap-2 focus:outline-none group transition-colors hover:text-indigo-600"
-                          onClick={e => { e.stopPropagation(); toggleMutterLike(mutter.id, mutter.likedByMe!); }}
+                          onClick={(e: React.MouseEvent) => { e.stopPropagation(); toggleMutterLike(mutter.id, mutter.likedByMe!); }}
                           disabled={mutterLikeLoading === mutter.id}
                           aria-label={mutter.likedByMe ? 'いいね解除' : 'いいね'}
                         >
@@ -702,7 +701,7 @@ const Home: React.FC = () => {
                         </button>
                         <button
                           className="flex items-center gap-2 focus:outline-none group transition-colors hover:text-indigo-600"
-                          onClick={e => { e.stopPropagation(); openMutterCommentModal(mutter.id); }}
+                          onClick={(e: React.MouseEvent) => { e.stopPropagation(); openMutterCommentModal(mutter.id); }}
                           aria-label="コメント一覧・投稿"
                         >
                           <MessageSquare className="w-5 h-5 text-gray-400 group-hover:scale-110 transition-transform" />
@@ -754,7 +753,7 @@ const Home: React.FC = () => {
                     <p className="text-sm mt-1">最初のコメントを投稿しましょう</p>
                   </div>
                 ) : (
-                  comments.map(c => (
+                  comments.map((c: Comment) => (
                     <div key={c.id} className="flex gap-3 p-3 hover:bg-gray-50 rounded-xl transition-colors">
                       <div className="w-10 h-10 rounded-full bg-gray-200 overflow-hidden flex-shrink-0 border-2 border-white shadow-sm">
                         {c.user?.profile_image_url ? (
@@ -783,7 +782,7 @@ const Home: React.FC = () => {
                 rows={3}
                 placeholder="コメントを入力..."
                 value={commentInput}
-                onChange={e => setCommentInput(e.target.value)}
+                onChange={(e: React.ChangeEvent<HTMLTextAreaElement>) => setCommentInput(e.target.value)}
                 disabled={commentLoading}
               />
               <button
@@ -820,7 +819,7 @@ const Home: React.FC = () => {
                     <p className="text-sm mt-1">最初のコメントを投稿しましょう</p>
                   </div>
                 ) : (
-                  mutterComments.map(c => (
+                  mutterComments.map((c: Comment) => (
                     <div key={c.id} className="flex gap-3 p-3 hover:bg-gray-50 rounded-xl transition-colors">
                       <div className="w-10 h-10 rounded-full bg-gray-200 overflow-hidden flex-shrink-0 border-2 border-white shadow-sm">
                         {c.user?.profile_image_url ? (
@@ -849,7 +848,7 @@ const Home: React.FC = () => {
                 rows={3}
                 placeholder="コメントを入力..."
                 value={mutterCommentInput}
-                onChange={e => setMutterCommentInput(e.target.value)}
+                onChange={(e: React.ChangeEvent<HTMLTextAreaElement>) => setMutterCommentInput(e.target.value)}
                 disabled={mutterCommentLoading}
               />
               <button

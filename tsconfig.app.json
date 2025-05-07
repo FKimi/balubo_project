@@ -22,7 +22,7 @@
     
     /* JSX設定 */
     "jsxImportSource": "react",
-    "types": ["react", "react-dom"],
+    "types": ["react", "react-dom", "custom"],
     
     /* Path Aliases */
     "baseUrl": ".",

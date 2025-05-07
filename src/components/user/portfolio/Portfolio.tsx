@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useCallback } from 'react';
+import React, { useState, useEffect, useCallback, FC } from 'react';
 import { useNavigate, useParams } from 'react-router-dom';
 import { supabase } from '../../../lib/supabase';
 import type { UserProfile, Work, UserCategory } from '../../../types';
@@ -30,7 +30,7 @@ type Career = {
   description?: string;
 };
 
-const Portfolio: React.FC = () => {
+const Portfolio: FC = () => {
   // --- 状態定義 ---
   const [userProfile, setUserProfile] = useState<UserProfile | null>(null);
   const [userWorks, setUserWorks] = useState<Work[]>([]);
@@ -218,8 +218,8 @@ const Portfolio: React.FC = () => {
       
       // featuredWorkIdsの順序を保持するようにソート
       const sortedWorks = featuredWorkIds
-        .map(id => worksWithTags.find(work => work.id === id))
-        .filter(work => work !== undefined) as Work[];
+        .map(id => worksWithTags.find((work) => work.id === id))
+        .filter((work): work is Work => work !== undefined);
       
       setFeaturedWorks(sortedWorks);
     } catch (error) {
@@ -487,7 +487,7 @@ const Portfolio: React.FC = () => {
       
       // フォロー状態を更新
       setIsFollowing(true);
-      setFollowerCount(prev => prev + 1);
+      setFollowerCount((prev: number) => prev + 1);
       
     } catch (error) {
       console.error('フォロー処理中のエラー:', error);
@@ -538,7 +538,7 @@ const Portfolio: React.FC = () => {
       
       // フォロー状態を更新
       setIsFollowing(false);
-      setFollowerCount(prev => Math.max(0, prev - 1));
+      setFollowerCount((prev: number) => Math.max(0, prev - 1));
       
     } catch (error) {
       console.error('アンフォロー処理中のエラー:', error);
@@ -827,7 +827,7 @@ const Portfolio: React.FC = () => {
 
       // 成功したら状態を更新して通知
       if (data && data.length > 0) {
-        setUserCategories(prev => [...prev, data[0]]);
+        setUserCategories((prev: UserCategory[]) => [...prev, data[0]]);
         setNewCategoryName('');
         setShowAddCategoryDialog(false);
         
@@ -863,7 +863,7 @@ const Portfolio: React.FC = () => {
   }, [userProfile?.id, fetchFeaturedWorks]);
 
   // toggleShareDialog関数の実装
-  const toggleShareDialog = () => setShowShareDialog(prev => !prev);
+  const toggleShareDialog = () => setShowShareDialog((prev: boolean) => !prev);
 
   // タグ頻度計算
   useEffect(() => {
@@ -874,7 +874,7 @@ const Portfolio: React.FC = () => {
     // 関連作品（タグが2つ以上一致するものを優先）
     if (userWorks.length > 1) {
       const mainTags = userWorks[0]?.tags || [];
-      const related = userWorks.filter(w => w.id !== userWorks[0].id && w.tags?.some((t: string) => mainTags.includes(t)));
+      const related = userWorks.filter((w: Work) => w.id !== userWorks[0].id && w.tags?.some((t: string) => mainTags.includes(t)));
       setRelatedWorks(related);
     } else {
       setRelatedWorks([]);
@@ -905,7 +905,7 @@ const Portfolio: React.FC = () => {
 
   // --- 編集ボタン押下時 ---
   const handleEditCareer = (careerId: string) => {
-    const target = careers.find(c => c.id === careerId);
+    const target = careers.find((c: Career) => c.id === careerId);
     if (target) {
       setCareerForm({
         company: target.company || '',
@@ -973,7 +973,7 @@ const Portfolio: React.FC = () => {
         }
         
         // 成功したらステートを更新
-        setCareers(prev => prev.map(c => c.id === editingCareerId ? { 
+        setCareers((prev: Career[]) => prev.map((c: Career) => c.id === editingCareerId ? { 
           ...c, 
           company: dataToSave.company,
           position: dataToSave.position,
@@ -1007,7 +1007,7 @@ const Portfolio: React.FC = () => {
         // 成功したらステートを更新
         if (data && data.length > 0) {
           // 新しいキャリア情報を追加
-          setCareers(prev => [data[0], ...prev]);
+          setCareers((prev: Career[]) => [data[0], ...prev]);
         }
       }
       
@@ -1058,7 +1058,7 @@ const Portfolio: React.FC = () => {
       }
       
       // 成功したらステートを更新
-      setCareers(prev => prev.filter(c => c.id !== careerId));
+      setCareers((prev: Career[]) => prev.filter((c: Career) => c.id !== careerId));
     } catch (error) {
       console.error('キャリア削除エラー:', error);
       alert('削除処理中にエラーが発生しました');
@@ -1078,7 +1078,7 @@ const Portfolio: React.FC = () => {
   }, [userProfile?.id]);
 
   // カテゴリでフィルタリングした作品リスト
-  const filteredWorks = userWorks.filter(work => 
+  const filteredWorks = userWorks.filter((work: Work) => 
     categoryTab === 'all' || work.categoryIds?.includes(categoryTab)
   );
 
@@ -1248,7 +1248,7 @@ const Portfolio: React.FC = () => {
                     works={featuredWorks}
                     onEditFeaturedWorks={() => navigate('/profile/edit')}
                     isCurrentUser={isCurrentUser}
-                    onWorkClick={(id) => navigate(`/user/works/${id}`)}
+                    onWorkClick={(id: string) => navigate(`/user/works/${id}`)}
                   />
                 </section>
               )}
@@ -1260,7 +1260,7 @@ const Portfolio: React.FC = () => {
                 categoryTab={categoryTab}
                 setCategoryTab={setCategoryTab}
                 isCurrentUser={isCurrentUser}
-                onWorkClick={(id) => id === 'create' ? handleWorkAdd() : navigate(`/user/works/${id}`)}
+                onWorkClick={(id: string) => id === 'create' ? handleWorkAdd() : navigate(`/user/works/${id}`)}
                 onAddCategory={() => setShowAddCategoryDialog(true)}
               />
 
@@ -1274,7 +1274,7 @@ const Portfolio: React.FC = () => {
                       className="w-full border rounded p-2 mb-4"
                       placeholder="カテゴリ名"
                       value={newCategoryName}
-                      onChange={(e) => setNewCategoryName(e.target.value)}
+                      onChange={(e: React.ChangeEvent<HTMLInputElement>) => setNewCategoryName(e.target.value)}
                     />
                     {categoryError && (
                       <p className="text-red-500 text-sm mb-4">{categoryError}</p>
@@ -1350,7 +1350,7 @@ const Portfolio: React.FC = () => {
                     ) : (
                       <div className="flex flex-wrap gap-2">
                         {userProfile?.skills && userProfile.skills.length > 0 ? (
-                          userProfile.skills.map((skill, index) => (
+                          userProfile.skills.map((skill: string, index: number) => (
                             <span 
                               key={index} 
                               className="inline-flex items-center px-3 py-1.5 rounded-full text-sm font-medium bg-indigo-50 text-indigo-700"
@@ -1399,7 +1399,7 @@ const Portfolio: React.FC = () => {
                         is_current_position: careerForm.is_current_position,
                         description: careerForm.description
                       }}
-                      onSave={async (form) => {
+                      onSave={async (form: Omit<Career, "id">) => {
                         await handleSaveCareer(form);
                       }}
                       onCancel={handleCancelCareer}
@@ -1414,7 +1414,7 @@ const Portfolio: React.FC = () => {
                   isCurrentUser={isCurrentUser}
                   editingCareerId={editingCareerId}
                   onEdit={handleEditCareer}
-                  onSave={(_careerId, form) => handleSaveCareer(form)}
+                  onSave={(_careerId: string, form: Omit<Career, "id">) => handleSaveCareer(form)}
                   onCancel={handleCancelCareer}
                   editLoading={careerLoading}
                   editError={careerError}
@@ -1430,8 +1430,8 @@ const Portfolio: React.FC = () => {
                     (() => {
                       // タグの頻度を計算
                       const tagCounts: Record<string, number> = {};
-                      userWorks.forEach(work => {
-                        work.tags?.forEach(tag => {
+                      userWorks.forEach((work: Work) => {
+                        work.tags?.forEach((tag: string) => {
                           tagCounts[tag] = (tagCounts[tag] || 0) + 1;
                         });
                       });
@@ -1468,7 +1468,7 @@ const Portfolio: React.FC = () => {
                     </div>
                   ) : activityMonthData.length > 0 ? (
                     <div className="grid grid-cols-12 gap-1">
-                      {activityMonthData.map((month, index) => (
+                      {activityMonthData.map((month: ActivityMonthData, index: number) => (
                         <div key={index} className="flex flex-col items-center">
                           <div 
                             className={`w-full h-16 rounded ${getActivityColorClass(month.count)}`}
