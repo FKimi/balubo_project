@@ -49,7 +49,7 @@ const WorkDetail = lazy(() => import('./components/user/works/WorkDetail'));
 const ProfileEdit = lazy(() => import('./components/user/ProfileEdit'));
 const Profile = lazy(() => import('./components/user/Profile'));
 const AIAnalysisDashboard = lazy(() => import('./components/user/AIAnalysisDashboard'));
-const Portfolio = lazy(() => import('./components/user/Portfolio'));
+const Portfolio = lazy(() => import('./components/user/portfolio/Portfolio'));
 // const TagAnalysis = lazy(() => import('./components/TagAnalysis').then(module => ({ default: module.TagAnalysis || module.default })));
 // const CreatorAnalysis = lazy(() => import('./components/CreatorAnalysis').then(module => ({ default: module.CreatorAnalysis || module.default })));
 const DebugPage = lazy(() => import('./components/pages/DebugPage'));
@@ -496,67 +496,71 @@ function App() {
   return (
     <AppProvider>
       <ToastProvider>
-        <div className="pt-4 min-h-screen bg-gradient-to-b from-white to-gray-50">
+        <div className="min-h-screen bg-gradient-to-b from-white to-gray-50">
           {/* LP・認証系ページではグローバルヘッダー非表示 */}
           {!shouldHideHeader && <GlobalHeader />}
           <Suspense fallback={<Loading />}>
-            <Routes>
-              {/* LPトップページ（ライター特化LP） */}
-              <Route path="/" element={<LandingPage />} />
-              {/* 認証コールバックルートを最優先で処理 */}
-              <Route path="/auth/callback" element={<AuthCallback />} />
-              <Route path="/callback" element={<AuthCallback />} />
-              {/* ユーザー用ホーム画面ルートを追加 */}
-              <Route path="/user/home" element={<Home />} />
-              {/* クリエイター向けのルート */}
-              <Route path="/creator/sign-in" element={<LoginForm />} />
-              <Route path="/creator/sign-up" element={<SignUpForm />} />
-              <Route path="/creator/dashboard" element={<Portfolio />} />
-              {/* クライアント（企業）向けルート */}
-              <Route path="/client/dashboard" element={<ClientDashboard />} />
-              <Route path="/client/projects" element={<ClientProjects />} />
-              <Route path="/client/project/new" element={<ClientProjectNew />} />
-              <Route path="/client" element={<ClientPage />} />
-              <Route path="/client/login" element={<ClientLogin />} />
-              <Route path="/client/register" element={<ClientRegister />} />
-              <Route path="/client/creators" element={<ClientCreators />} />
-              <Route path="/client/profile" element={<ClientProfileView />} />
-              <Route path="/client/profile/edit" element={<ClientProfile />} />
-              <Route path="/client/messages" element={<ClientMessages />} />
-              <Route path="/client/home" element={<Home />} />
-              {/* プロフィール関連ルート */}
-              <Route path="/portfolio" element={<Portfolio />} />
-              <Route path="/profile" element={<Profile />} />
-              <Route path="/profile/edit" element={<ProfileEdit />} />
-              <Route path="/settings" element={<Settings />} />
-              <Route path="/dashboard" element={<AIAnalysisDashboard />} />
-              {/* <Route path="/mypage" element={<Mypage />} /> */}
-              <Route path="/mypage" element={<Portfolio />} />
-              {/* 作品関連ルート */}
-              <Route path="/add-work" element={<WorkCreateWeb />} />
-              <Route path="/works/new" element={<WorkCreateWeb />} />
-              <Route path="/user/works/create" element={<WorkCreateWeb />} />
-              <Route path="/works/create" element={<WorkCreateWeb />} />
-              <Route path="/works/:id" element={<WorkDetail />} />
-              <Route path="/user/works/:id" element={<WorkDetail />} />
-              <Route path="/works/edit/:id" element={<WorkCreateWeb />} />
-              {/* ホーム画面 */}
-              <Route path="/home" element={<Home />} />
-              {/* 認証関連ルート */}
-              <Route path="/login" element={<LoginForm />} />
-              <Route path="/signup" element={<SignUpForm />} />
-              <Route path="/register" element={<Register />} />
-              {/* クリエイタープロフィールページ */}
-              <Route path="/creator/:id" element={<Profile />} />
-              {/* 検索ページ */}
-              <Route path="/search" element={<Suspense fallback={<Loading />}><SearchPage /></Suspense>} />
-              {/* ギャラリーページ */}
-              <Route path="/gallery" element={<Suspense fallback={<Loading />}><GalleryPage /></Suspense>} />
-              {/* メッセージページ */}
-              <Route path="/messages" element={<Suspense fallback={<Loading />}><MessagesPage /></Suspense>} />
-              {/* デバッグページ */}
-              <Route path="/debug" element={<DebugPage />} />
-            </Routes>
+            {/* ヘッダーの高さ分（h-14 = 56px）だけ上部にパディングを追加 */}
+            <div className={!shouldHideHeader ? 'pt-14' : ''}>
+              <Routes>
+                {/* LPトップページ（ライター特化LP） */}
+                <Route path="/" element={<LandingPage />} />
+                {/* 認証コールバックルートを最優先で処理 */}
+                <Route path="/auth/callback" element={<AuthCallback />} />
+                <Route path="/callback" element={<AuthCallback />} />
+                {/* ユーザー用ホーム画面ルートを追加 */}
+                <Route path="/user/home" element={<Home />} />
+                {/* クリエイター向けのルート */}
+                <Route path="/creator/sign-in" element={<LoginForm />} />
+                <Route path="/creator/sign-up" element={<SignUpForm />} />
+                <Route path="/creator/dashboard" element={<Portfolio />} />
+                {/* クライアント（企業）向けルート */}
+                <Route path="/client/dashboard" element={<ClientDashboard />} />
+                <Route path="/client/projects" element={<ClientProjects />} />
+                <Route path="/client/project/new" element={<ClientProjectNew />} />
+                <Route path="/client" element={<ClientPage />} />
+                <Route path="/client/login" element={<ClientLogin />} />
+                <Route path="/client/register" element={<ClientRegister />} />
+                <Route path="/client/creators" element={<ClientCreators />} />
+                <Route path="/client/profile" element={<ClientProfileView />} />
+                <Route path="/client/profile/edit" element={<ClientProfile />} />
+                <Route path="/client/messages" element={<ClientMessages />} />
+                <Route path="/client/home" element={<Home />} />
+                {/* プロフィール関連ルート */}
+                <Route path="/portfolio" element={<Portfolio />} />
+                <Route path="/profile" element={<Profile />} />
+                <Route path="/profile/edit" element={<ProfileEdit />} />
+                <Route path="/settings" element={<Settings />} />
+                <Route path="/dashboard" element={<AIAnalysisDashboard />} />
+                {/* <Route path="/mypage" element={<Mypage />} /> */}
+                <Route path="/mypage" element={<Portfolio />} />
+                {/* 作品関連ルート */}
+                <Route path="/add-work" element={<WorkCreateWeb />} />
+                <Route path="/works/new" element={<WorkCreateWeb />} />
+                <Route path="/user/works/create" element={<WorkCreateWeb />} />
+                <Route path="/works/create" element={<WorkCreateWeb />} />
+                <Route path="/works/:id" element={<WorkDetail />} />
+                <Route path="/user/works/:id" element={<WorkDetail />} />
+                <Route path="/works/edit/:id" element={<WorkCreateWeb />} />
+                {/* ホーム画面 */}
+                <Route path="/home" element={<Home />} />
+                {/* 認証関連ルート */}
+                <Route path="/login" element={<LoginForm />} />
+                <Route path="/signup" element={<SignUpForm />} />
+                <Route path="/register" element={<Register />} />
+                {/* クリエイタープロフィールページ */}
+                <Route path="/creator/:id" element={<Portfolio />} />
+                <Route path="/profile/:id" element={<Portfolio />} />
+                {/* 検索ページ */}
+                <Route path="/search" element={<Suspense fallback={<Loading />}><SearchPage /></Suspense>} />
+                {/* ギャラリーページ */}
+                <Route path="/gallery" element={<Suspense fallback={<Loading />}><GalleryPage /></Suspense>} />
+                {/* メッセージページ */}
+                <Route path="/messages" element={<Suspense fallback={<Loading />}><MessagesPage /></Suspense>} />
+                {/* デバッグページ */}
+                <Route path="/debug" element={<DebugPage />} />
+              </Routes>
+            </div>
           </Suspense>
         </div>
         {/* ボトムナビゲーション（モバイルのみ表示） */}

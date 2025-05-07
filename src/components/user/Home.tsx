@@ -3,6 +3,7 @@ import { useState, useCallback } from 'react';
 import { supabase } from '../../lib/supabase';
 import { useNavigate } from 'react-router-dom';
 import { Heart, MessageSquare, Plus } from 'lucide-react';
+import XRecommendedUsers from './XRecommendedUsers';
 
 // 型定義
 interface Work {
@@ -54,7 +55,6 @@ const Home: React.FC = () => {
   const [works, setWorks] = useState<Work[]>([]);
   const [mutters, setMutters] = useState<Mutter[]>([]);
   const [loading, setLoading] = useState(true);
-  const [filterOption, setFilterOption] = useState<'latest' | 'popular'>('latest');
   const [feedType, setFeedType] = useState<'works' | 'mutters'>('works');
   const [likeLoading, setLikeLoading] = useState<string | null>(null); 
   const [commentModalWorkId, setCommentModalWorkId] = useState<string | null>(null);
@@ -76,7 +76,7 @@ const Home: React.FC = () => {
       const worksQuery = supabase
         .from('works')
         .select('*')
-        .order(filterOption === 'latest' ? 'created_at' : 'title', { ascending: false })
+        .order('created_at', { ascending: false })
         .limit(20);
       const { data: worksData, error: worksError } = await worksQuery;
       if (worksError) {
@@ -133,7 +133,7 @@ const Home: React.FC = () => {
     } finally {
       setLoading(false);
     }
-  }, [filterOption]);
+  }, []);
 
   const fetchMutters = useCallback(async () => {
     try {
@@ -458,11 +458,6 @@ const Home: React.FC = () => {
     }
   }, [mutterCommentInput, fetchMutterComments]);
 
-  const openCommentModal = useCallback((workId: string) => {
-    setCommentModalWorkId(workId);
-    setCommentInput('');
-    fetchComments(workId);
-  }, [fetchComments]);
 
   const closeCommentModal = useCallback(() => {
     setCommentModalWorkId(null);
@@ -523,19 +518,19 @@ const Home: React.FC = () => {
   return (
     <>
       {/* 3カラムレイアウト */}
-      <div className="flex justify-between bg-gray-50 min-h-screen pt-0 w-full max-w-screen-2xl mx-auto">
+      <div className="flex justify-between bg-gradient-to-b from-gray-50 to-white min-h-screen pt-0 w-full max-w-screen-2xl mx-auto">
         {/* 左サイドバー */}
         <aside className="hidden lg:flex flex-col min-w-[72px] max-w-[220px] w-full px-2 py-6 overflow-y-auto h-screen">
         </aside>
         {/* メインカラム */}
-        <main className="flex-1 max-w-xl xl:max-w-2xl w-full px-0 sm:px-4 border-x border-gray-200 bg-white min-h-screen">
+        <main className="flex-1 max-w-full sm:max-w-2xl md:max-w-xl lg:max-w-2xl w-full px-0 sm:px-4 border-x border-gray-100 bg-white min-h-screen shadow-sm">
           {/* ヘッダー＆タブ・フィルタ一体型カード */}
-          <div className="bg-white border-b border-gray-200 shadow-sm sticky top-0 z-20">
-            <div className="max-w-full sm:max-w-2xl mx-auto flex flex-col gap-3 px-2 sm:px-6 py-3">
+          <div className="bg-white border-b border-gray-100 shadow-sm sticky top-0 z-20 backdrop-blur-sm bg-white/95">
+            <div className="max-w-full sm:max-w-2xl mx-auto flex flex-col gap-4 px-4 sm:px-6 py-4">
               <div className="flex items-center justify-between">
-                <h1 className="text-xl sm:text-2xl font-bold text-indigo-700 tracking-tight">ホーム</h1>
+                <h1 className="text-2xl sm:text-3xl font-bold text-indigo-700 tracking-tight">ホーム</h1>
                 <button
-                  className="flex items-center gap-1 px-4 py-2 bg-indigo-600 hover:bg-indigo-700 text-white rounded-full font-semibold text-base shadow disabled:opacity-50 transition"
+                  className="flex items-center gap-2 px-5 py-2.5 bg-indigo-600 hover:bg-indigo-700 text-white rounded-full font-medium text-sm sm:text-base shadow-md hover:shadow-lg transform hover:-translate-y-0.5 transition-all duration-200 disabled:opacity-50"
                   onClick={() => navigate('/works/new')}
                 >
                   <Plus className="w-4 h-4" /> 新規投稿
@@ -543,31 +538,23 @@ const Home: React.FC = () => {
               </div>
               <div className="flex flex-wrap gap-2">
                 <button
-                  className={`px-4 py-2 rounded-full font-semibold text-sm sm:text-base shadow-sm border transition ${feedType === 'works' ? 'bg-indigo-600 text-white border-indigo-600' : 'bg-gray-100 text-gray-600 border-gray-200 hover:bg-indigo-50'}`}
+                  className={`px-4 py-2 rounded-full font-semibold text-sm sm:text-base shadow-sm border transition-all duration-200 ${feedType === 'works' ? 'bg-indigo-600 text-white border-indigo-600 shadow-md' : 'bg-white text-gray-600 border-gray-200 hover:bg-indigo-50'}`}
                   onClick={() => setFeedType('works')}
                 >作品フィード</button>
                 <button
-                  className={`px-4 py-2 rounded-full font-semibold text-sm sm:text-base shadow-sm border transition ${feedType === 'mutters' ? 'bg-indigo-600 text-white border-indigo-600' : 'bg-gray-100 text-gray-600 border-gray-200 hover:bg-indigo-50'}`}
+                  className={`px-4 py-2 rounded-full font-semibold text-sm sm:text-base shadow-sm border transition-all duration-200 ${feedType === 'mutters' ? 'bg-indigo-600 text-white border-indigo-600 shadow-md' : 'bg-white text-gray-600 border-gray-200 hover:bg-indigo-50'}`}
                   onClick={() => setFeedType('mutters')}
                 >ぼやきフィード</button>
-                <button
-                  className={`px-4 py-2 rounded-full font-semibold text-sm sm:text-base shadow-sm border transition ${filterOption === 'latest' ? 'bg-indigo-100 text-indigo-700 border-indigo-300' : 'bg-gray-100 text-gray-600 border-gray-200 hover:bg-indigo-50'}`}
-                  onClick={() => setFilterOption('latest')}
-                >最新</button>
-                <button
-                  className={`px-4 py-2 rounded-full font-semibold text-sm sm:text-base shadow-sm border transition ${filterOption === 'popular' ? 'bg-indigo-100 text-indigo-700 border-indigo-300' : 'bg-gray-100 text-gray-600 border-gray-200 hover:bg-indigo-50'}`}
-                  onClick={() => setFilterOption('popular')}
-                >人気</button>
               </div>
             </div>
           </div>
 
           {/* ぼやき投稿フォーム（ぼやきフィード時のみ） */}
           {feedType === 'mutters' && (
-            <div className="max-w-full sm:max-w-2xl mx-auto px-2 sm:px-6 py-3">
-              <div className="bg-white rounded-2xl shadow-md flex flex-col sm:flex-row items-stretch sm:items-end gap-2 p-1 border border-gray-100">
+            <div className="max-w-full sm:max-w-2xl mx-auto px-4 sm:px-6 py-5">
+              <div className="bg-white rounded-2xl shadow-md flex flex-col sm:flex-row items-stretch sm:items-end gap-3 p-4 border border-gray-100 hover:shadow-lg transition-shadow duration-200">
                 <textarea
-                  className={`flex-1 border rounded-xl p-3 text-base resize-none focus:outline-none focus:ring-2 focus:ring-indigo-200 bg-gray-50 ${inputError ? 'border-red-400' : 'border-gray-200'}`}
+                  className={`flex-1 border rounded-xl p-4 text-base resize-none focus:outline-none focus:ring-2 focus:ring-indigo-200 bg-gray-50 ${inputError ? 'border-red-400' : 'border-gray-200'}`}
                   placeholder="いまの気持ちやひとことを投稿..."
                   rows={2}
                   maxLength={200}
@@ -576,76 +563,95 @@ const Home: React.FC = () => {
                   disabled={posting}
                 />
                 <button
-                  className="px-5 py-2 bg-indigo-600 hover:bg-indigo-700 text-white rounded-xl font-semibold text-base shadow disabled:opacity-50 transition"
+                  className="px-6 py-2.5 bg-indigo-600 hover:bg-indigo-700 text-white rounded-xl font-medium text-base shadow-sm hover:shadow-md transition-all duration-200 disabled:opacity-50"
                   onClick={postMutter}
                   disabled={posting}
-                >投稿</button>
+                >投稿する</button>
               </div>
-              {inputError && <div className="text-red-500 text-sm mt-1 ml-1">{inputError}</div>}
+              {inputError && <div className="text-red-500 text-sm mt-2 ml-1">{inputError}</div>}
             </div>
           )}
 
           {/* メインフィード */}
-          <div className="max-w-full sm:max-w-2xl w-full mx-auto py-4 sm:py-8 px-2 sm:px-6">
+          <div className="max-w-full w-full mx-auto py-6 sm:py-8 px-4 sm:px-6">
             {loading ? (
-              <div className="text-center text-gray-400 py-20">読み込み中...</div>
+              <div className="flex items-center justify-center py-20">
+                <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-indigo-500"></div>
+              </div>
             ) : feedType === 'works' ? (
               works.length === 0 ? (
-                <div className="text-center text-gray-400 py-12">作品がありません</div>
+                <div className="text-center text-gray-400 py-16 bg-gray-50/50 rounded-2xl">
+                  <div className="text-gray-300 mb-3 text-5xl">🖼️</div>
+                  <p className="text-lg font-medium text-gray-500">作品がありません</p>
+                  <p className="text-sm text-gray-400 mt-2">新しい作品を投稿してみましょう</p>
+                </div>
               ) : (
-                <div className="flex flex-col gap-5">
+                <div className="flex flex-col gap-6">
                   {works.map(work => {
                     const thumb = work.thumbnailUrl || work.thumbnail_url;
                     return (
                       <div
                         key={work.id}
-                        className="bg-white rounded-2xl shadow-md border border-gray-100 flex flex-col p-0 sm:p-1 overflow-hidden transition hover:shadow-lg cursor-pointer no-underline"
+                        className="bg-white rounded-2xl shadow-md border border-gray-100 flex flex-col p-0 sm:p-1 overflow-hidden transition-all duration-300 hover:shadow-xl hover:border-indigo-200 cursor-pointer no-underline transform hover:-translate-y-1"
+                        onClick={() => navigate(`/works/${work.id}`)}
                       >
                         {thumb ? (
                           <img
                             src={thumb}
                             alt="thumbnail"
-                            className="w-full h-44 object-cover rounded-t-2xl bg-white"
+                            className="w-full h-52 object-cover rounded-t-2xl bg-white"
                             style={{ display: 'block' }}
                           />
                         ) : (
-                          <div className="w-full h-44 bg-gray-100 flex items-center justify-center text-gray-300 text-4xl rounded-t-2xl">🖼️</div>
+                          <div className="w-full h-52 bg-gradient-to-r from-gray-100 to-gray-50 flex items-center justify-center text-gray-300 text-5xl rounded-t-2xl">🖼️</div>
                         )}
-                        <div className="flex flex-col gap-2 px-4 pb-4 pt-2">
-                          <div className="flex items-center gap-2 mb-1">
+                        <div className="flex flex-col gap-3 px-5 pb-5 pt-3">
+                          <div className="flex items-center gap-3 mb-1">
                             <div
-                              className="w-8 h-8 rounded-full bg-gray-200 overflow-hidden flex-shrink-0"
+                              className="w-10 h-10 rounded-full bg-gray-200 overflow-hidden flex-shrink-0 border-2 border-white shadow-sm transform transition-transform hover:scale-110"
                               onClick={e => { e.stopPropagation(); if (work.user) navigate(`/profile/${work.user.id}`); }}
                             >
                               {work.user?.profile_image_url ? (
                                 <img src={work.user.profile_image_url} alt="avatar" className="w-full h-full object-cover" />
                               ) : (
-                                <div className="w-6 h-6 text-gray-400 mx-auto my-1" />
+                                <div className="w-full h-full flex items-center justify-center bg-gradient-to-br from-indigo-100 to-purple-100 text-indigo-500">
+                                  <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M16 7a4 4 0 11-8 0 4 4 0 018 0zM12 14a7 7 0 00-7 7h14a7 7 0 00-7-7z" />
+                                  </svg>
+                                </div>
                               )}
                             </div>
-                            <span className="font-bold text-base sm:text-lg text-gray-900 mb-1 leading-snug">{work.user?.full_name || 'ユーザー'}</span>
-                            <span className="text-xs text-gray-400">{new Date(work.created_at).toLocaleDateString('ja-JP', { month: 'short', day: 'numeric' })}</span>
+                            <div className="flex flex-col">
+                              <span 
+                                className="font-bold text-base sm:text-lg text-gray-900 leading-snug hover:text-indigo-600 cursor-pointer transition-colors"
+                                onClick={e => { e.stopPropagation(); if (work.user) navigate(`/profile/${work.user.id}`); }}
+                              >
+                                {work.user?.full_name || 'ユーザー'}
+                              </span>
+                              <span className="text-xs text-gray-400">{new Date(work.created_at).toLocaleDateString('ja-JP', { year: 'numeric', month: 'short', day: 'numeric' })}</span>
+                            </div>
                           </div>
-                          <div className="font-bold text-base sm:text-lg text-gray-900 mb-1 line-clamp-2 leading-snug">{work.title}</div>
-                          <div className="text-gray-700 text-sm sm:text-base line-clamp-2 leading-snug">{work.description}</div>
-                          <div className="flex items-center gap-4 mt-2 text-gray-400 text-sm">
+                          <div className="font-bold text-base sm:text-xl text-gray-900 mb-1 line-clamp-2 leading-snug">{work.title}</div>
+                          <div className="text-gray-700 text-sm sm:text-base line-clamp-2 leading-relaxed">{work.description}</div>
+                          <div className="flex items-center gap-6 mt-2 text-gray-500 text-sm">
                             <button
-                              className="flex items-center gap-1 focus:outline-none"
+                              className="flex items-center gap-2 focus:outline-none group transition-colors hover:text-indigo-600"
                               onClick={e => { e.stopPropagation(); toggleLike(work.id, work.likedByMe!); }}
                               disabled={likeLoading === work.id}
                               aria-label={work.likedByMe ? 'いいね解除' : 'いいね'}
                             >
-                              <Heart className={`w-4 h-4 transition-colors ${work.likedByMe ? 'text-red-500 fill-red-500' : 'text-gray-400'}`} />
+                              <Heart className={`w-5 h-5 transition-all ${work.likedByMe ? 'text-red-500 fill-red-500 scale-110' : 'text-gray-400 group-hover:scale-110'}`} />
                               <span>{work.likeCount}</span>
                               {likeLoading === work.id && <span className="ml-1 animate-spin">⏳</span>}
                             </button>
                             <button
-                              className="flex items-center gap-1 focus:outline-none"
-                              onClick={e => { e.stopPropagation(); openCommentModal(work.id); }}
+                              className="flex items-center gap-2 focus:outline-none group relative transition-colors hover:text-indigo-600"
+                              onClick={e => { e.stopPropagation(); navigate(`/works/${work.id}`); }}
                               aria-label="コメント一覧・投稿"
                             >
-                              <MessageSquare className="w-4 h-4" />
+                              <MessageSquare className="w-5 h-5 text-gray-400 group-hover:scale-110 transition-transform" />
                               <span>{work.comments ?? 0}</span>
+                              <span className="absolute bottom-full left-1/2 transform -translate-x-1/2 mb-1 px-2 py-1 bg-gray-800 text-white text-xs rounded whitespace-nowrap opacity-0 group-hover:opacity-100 transition-opacity duration-200 pointer-events-none z-10">詳細ページでコメント</span>
                             </button>
                           </div>
                         </div>
@@ -656,40 +662,50 @@ const Home: React.FC = () => {
               )
             ) : (
               mutters.length === 0 ? (
-                <div className="text-center text-gray-400 py-12">ぼやきがありません</div>
+                <div className="text-center text-gray-400 py-16 bg-gray-50/50 rounded-2xl">
+                  <div className="text-gray-300 mb-3 text-5xl">💭</div>
+                  <p className="text-lg font-medium text-gray-500">ぼやきがありません</p>
+                  <p className="text-sm text-gray-400 mt-2">今の気持ちを投稿してみましょう</p>
+                </div>
               ) : (
                 <div className="flex flex-col gap-5">
                   {mutters.map(mutter => (
-                    <div key={mutter.id} className="bg-white rounded-2xl shadow-md border border-gray-100 flex flex-col p-4 overflow-hidden transition hover:shadow-lg">
-                      <div className="flex items-center gap-2 mb-1">
-                        <div className="w-8 h-8 rounded-full bg-gray-200 overflow-hidden flex-shrink-0">
+                    <div key={mutter.id} className="bg-white rounded-2xl shadow-md border border-gray-100 flex flex-col p-5 overflow-hidden transition-all duration-300 hover:shadow-lg hover:border-indigo-200 transform hover:-translate-y-0.5">
+                      <div className="flex items-center gap-3 mb-3">
+                        <div className="w-10 h-10 rounded-full bg-gray-200 overflow-hidden flex-shrink-0 border-2 border-white shadow-sm">
                           {mutter.user?.profile_image_url ? (
                             <img src={mutter.user.profile_image_url} alt="avatar" className="w-full h-full object-cover" />
                           ) : (
-                            <div className="w-6 h-6 text-gray-400 mx-auto my-1" />
+                            <div className="w-full h-full flex items-center justify-center bg-gradient-to-br from-indigo-100 to-purple-100 text-indigo-500">
+                              <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M16 7a4 4 0 11-8 0 4 4 0 018 0zM12 14a7 7 0 00-7 7h14a7 7 0 00-7-7z" />
+                              </svg>
+                            </div>
                           )}
                         </div>
-                        <span className="font-bold text-base text-gray-900 mb-1 leading-snug">{mutter.user?.full_name || 'ユーザー'}</span>
-                        <span className="text-xs text-gray-400">{new Date(mutter.created_at).toLocaleDateString('ja-JP', { month: 'short', day: 'numeric' })}</span>
+                        <div className="flex flex-col">
+                          <span className="font-bold text-base text-gray-900 leading-snug">{mutter.user?.full_name || 'ユーザー'}</span>
+                          <span className="text-xs text-gray-400">{new Date(mutter.created_at).toLocaleDateString('ja-JP', { year: 'numeric', month: 'short', day: 'numeric' })}</span>
+                        </div>
                       </div>
-                      <div className="text-gray-700 text-sm sm:text-base leading-snug mb-2">{mutter.content}</div>
-                      <div className="flex items-center gap-4 mt-2 text-gray-400 text-sm">
+                      <div className="text-gray-700 text-sm sm:text-base leading-relaxed mb-4 whitespace-pre-line">{mutter.content}</div>
+                      <div className="flex items-center gap-6 mt-2 text-gray-500 text-sm">
                         <button
-                          className="flex items-center gap-1 focus:outline-none"
+                          className="flex items-center gap-2 focus:outline-none group transition-colors hover:text-indigo-600"
                           onClick={e => { e.stopPropagation(); toggleMutterLike(mutter.id, mutter.likedByMe!); }}
                           disabled={mutterLikeLoading === mutter.id}
                           aria-label={mutter.likedByMe ? 'いいね解除' : 'いいね'}
                         >
-                          <Heart className={`w-4 h-4 transition-colors ${mutter.likedByMe ? 'text-red-500 fill-red-500' : 'text-gray-400'}`} />
+                          <Heart className={`w-5 h-5 transition-all ${mutter.likedByMe ? 'text-red-500 fill-red-500 scale-110' : 'text-gray-400 group-hover:scale-110'}`} />
                           <span>{mutter.likeCount}</span>
                           {mutterLikeLoading === mutter.id && <span className="ml-1 animate-spin">⏳</span>}
                         </button>
                         <button
-                          className="flex items-center gap-1 focus:outline-none"
+                          className="flex items-center gap-2 focus:outline-none group transition-colors hover:text-indigo-600"
                           onClick={e => { e.stopPropagation(); openMutterCommentModal(mutter.id); }}
                           aria-label="コメント一覧・投稿"
                         >
-                          <MessageSquare className="w-4 h-4" />
+                          <MessageSquare className="w-5 h-5 text-gray-400 group-hover:scale-110 transition-transform" />
                           <span>{mutter.comments ?? 0}</span>
                         </button>
                       </div>
@@ -698,62 +714,80 @@ const Home: React.FC = () => {
                 </div>
               )
             )}
+            
+            {/* モバイル・タブレット用おすすめユーザー（md以下で表示） */}
+            <div className="md:hidden mt-16">
+              <h2 className="font-bold text-xl mb-6 px-2 text-gray-700">おすすめユーザー</h2>
+              <XRecommendedUsers hideTitle={true} />
+            </div>
           </div>
         </main>
         {/* 右カラム */}
-        <aside className="hidden xl:block min-w-[180px] max-w-[240px] w-full px-2 py-6">
+        <aside className="hidden md:block min-w-[280px] xl:min-w-[320px] max-w-[320px] w-full px-5 py-8">
+          <div className="sticky top-4 space-y-6">
+            <XRecommendedUsers />
+          </div>
         </aside>
       </div>
 
       {/* コメントモーダル */}
       {commentModalWorkId && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black bg-opacity-30">
-          <div className="bg-white rounded-xl shadow-lg w-full max-w-md mx-auto p-6 relative">
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black bg-opacity-50 backdrop-blur-sm">
+          <div className="bg-white rounded-2xl shadow-xl w-full max-w-md mx-auto p-6 relative animate-fadeIn">
             <button
-              className="absolute top-2 right-2 text-gray-400 hover:text-gray-600"
+              className="absolute top-3 right-3 text-gray-400 hover:text-gray-600 p-1 rounded-full hover:bg-gray-100 transition-colors"
               onClick={closeCommentModal}
               aria-label="閉じる"
             >×</button>
-            <h3 className="text-lg font-bold mb-2">コメント</h3>
+            <h3 className="text-xl font-bold mb-4 text-gray-800">コメント</h3>
             {commentLoading ? (
-              <div className="text-gray-400 py-8 text-center">読み込み中...</div>
+              <div className="flex justify-center py-10">
+                <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-indigo-500"></div>
+              </div>
             ) : commentError ? (
-              <div className="text-red-500 py-4 text-center">{commentError}</div>
+              <div className="text-red-500 py-4 text-center bg-red-50 rounded-lg">{commentError}</div>
             ) : (
-              <div className="max-h-60 overflow-y-auto mb-4">
+              <div className="max-h-64 overflow-y-auto mb-5 pr-2 space-y-4">
                 {comments.length === 0 ? (
-                  <div className="text-gray-400 py-6 text-center">まだコメントがありません</div>
+                  <div className="text-center text-gray-400 py-8 bg-gray-50 rounded-xl">
+                    <p className="text-base">まだコメントがありません</p>
+                    <p className="text-sm mt-1">最初のコメントを投稿しましょう</p>
+                  </div>
                 ) : (
                   comments.map(c => (
-                    <div key={c.id} className="flex gap-2 mb-3">
-                      <div className="w-8 h-8 rounded-full bg-gray-200 overflow-hidden flex-shrink-0">
+                    <div key={c.id} className="flex gap-3 p-3 hover:bg-gray-50 rounded-xl transition-colors">
+                      <div className="w-10 h-10 rounded-full bg-gray-200 overflow-hidden flex-shrink-0 border-2 border-white shadow-sm">
                         {c.user?.profile_image_url ? (
                           <img src={c.user.profile_image_url} alt="avatar" className="w-full h-full object-cover" />
                         ) : (
-                          <div className="w-6 h-6 text-gray-400 mx-auto my-1" />
+                          <div className="w-full h-full flex items-center justify-center bg-gradient-to-br from-indigo-100 to-purple-100 text-indigo-500">
+                            <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M16 7a4 4 0 11-8 0 4 4 0 018 0zM12 14a7 7 0 00-7 7h14a7 7 0 00-7-7z" />
+                            </svg>
+                          </div>
                         )}
                       </div>
                       <div className="flex-1">
                         <div className="font-bold text-sm text-gray-900">{c.user?.full_name || 'ユーザー'}</div>
-                        <div className="text-gray-700 text-sm whitespace-pre-line">{c.text}</div>
-                        <div className="text-xs text-gray-400 mt-1">{new Date(c.created_at).toLocaleString('ja-JP', { month: 'short', day: 'numeric', hour: '2-digit', minute: '2-digit' })}</div>
+                        <div className="text-gray-700 text-sm whitespace-pre-line mt-1">{c.text}</div>
+                        <div className="text-xs text-gray-400 mt-2">{new Date(c.created_at).toLocaleString('ja-JP', { month: 'short', day: 'numeric', hour: '2-digit', minute: '2-digit' })}</div>
                       </div>
                     </div>
                   ))
                 )}
               </div>
             )}
-            <div className="flex flex-col gap-2">
+            <div className="flex flex-col gap-3 border-t pt-4">
               <textarea
-                className="w-full border rounded-md px-3 py-2 text-sm resize-none focus:outline-none focus:ring-2 focus:ring-blue-200"
-                rows={2}
+                className="w-full border border-gray-200 rounded-xl px-4 py-3 text-base resize-none focus:outline-none focus:ring-2 focus:ring-indigo-300 focus:border-transparent"
+                rows={3}
                 placeholder="コメントを入力..."
                 value={commentInput}
                 onChange={e => setCommentInput(e.target.value)}
                 disabled={commentLoading}
               />
               <button
-                className="bg-blue-500 text-white rounded-md px-4 py-2 text-sm font-bold hover:bg-blue-600 disabled:opacity-60"
+                className="bg-indigo-600 text-white rounded-xl px-5 py-2.5 text-base font-medium hover:bg-indigo-700 disabled:opacity-60 shadow-sm hover:shadow transition-all"
                 onClick={() => postComment(commentModalWorkId)}
                 disabled={commentLoading || !commentInput.trim()}
               >{commentLoading ? '送信中...' : 'コメント送信'}</button>
@@ -764,53 +798,62 @@ const Home: React.FC = () => {
 
       {/* ぼやき コメントモーダル */}
       {mutterCommentModalId && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black bg-opacity-30">
-          <div className="bg-white rounded-xl shadow-lg w-full max-w-md mx-auto p-6 relative">
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black bg-opacity-50 backdrop-blur-sm">
+          <div className="bg-white rounded-2xl shadow-xl w-full max-w-md mx-auto p-6 relative animate-fadeIn">
             <button
-              className="absolute top-2 right-2 text-gray-400 hover:text-gray-600"
+              className="absolute top-3 right-3 text-gray-400 hover:text-gray-600 p-1 rounded-full hover:bg-gray-100 transition-colors"
               onClick={closeMutterCommentModal}
               aria-label="閉じる"
             >×</button>
-            <h3 className="text-lg font-bold mb-2">コメント</h3>
+            <h3 className="text-xl font-bold mb-4 text-gray-800">コメント</h3>
             {mutterCommentLoading ? (
-              <div className="text-gray-400 py-8 text-center">読み込み中...</div>
+              <div className="flex justify-center py-10">
+                <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-indigo-500"></div>
+              </div>
             ) : mutterCommentError ? (
-              <div className="text-red-500 py-4 text-center">{mutterCommentError}</div>
+              <div className="text-red-500 py-4 text-center bg-red-50 rounded-lg">{mutterCommentError}</div>
             ) : (
-              <div className="max-h-60 overflow-y-auto mb-4">
+              <div className="max-h-64 overflow-y-auto mb-5 pr-2 space-y-4">
                 {mutterComments.length === 0 ? (
-                  <div className="text-gray-400 py-6 text-center">まだコメントがありません</div>
+                  <div className="text-center text-gray-400 py-8 bg-gray-50 rounded-xl">
+                    <p className="text-base">まだコメントがありません</p>
+                    <p className="text-sm mt-1">最初のコメントを投稿しましょう</p>
+                  </div>
                 ) : (
                   mutterComments.map(c => (
-                    <div key={c.id} className="flex gap-2 mb-3">
-                      <div className="w-8 h-8 rounded-full bg-gray-200 overflow-hidden flex-shrink-0">
+                    <div key={c.id} className="flex gap-3 p-3 hover:bg-gray-50 rounded-xl transition-colors">
+                      <div className="w-10 h-10 rounded-full bg-gray-200 overflow-hidden flex-shrink-0 border-2 border-white shadow-sm">
                         {c.user?.profile_image_url ? (
                           <img src={c.user.profile_image_url} alt="avatar" className="w-full h-full object-cover" />
                         ) : (
-                          <div className="w-6 h-6 text-gray-400 mx-auto my-1" />
+                          <div className="w-full h-full flex items-center justify-center bg-gradient-to-br from-indigo-100 to-purple-100 text-indigo-500">
+                            <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M16 7a4 4 0 11-8 0 4 4 0 018 0zM12 14a7 7 0 00-7 7h14a7 7 0 00-7-7z" />
+                            </svg>
+                          </div>
                         )}
                       </div>
                       <div className="flex-1">
                         <div className="font-bold text-sm text-gray-900">{c.user?.full_name || 'ユーザー'}</div>
-                        <div className="text-gray-700 text-sm whitespace-pre-line">{c.text}</div>
-                        <div className="text-xs text-gray-400 mt-1">{new Date(c.created_at).toLocaleString('ja-JP', { month: 'short', day: 'numeric', hour: '2-digit', minute: '2-digit' })}</div>
+                        <div className="text-gray-700 text-sm whitespace-pre-line mt-1">{c.text}</div>
+                        <div className="text-xs text-gray-400 mt-2">{new Date(c.created_at).toLocaleString('ja-JP', { month: 'short', day: 'numeric', hour: '2-digit', minute: '2-digit' })}</div>
                       </div>
                     </div>
                   ))
                 )}
               </div>
             )}
-            <div className="flex flex-col gap-2">
+            <div className="flex flex-col gap-3 border-t pt-4">
               <textarea
-                className="w-full border rounded-md px-3 py-2 text-sm resize-none focus:outline-none focus:ring-2 focus:ring-blue-200"
-                rows={2}
+                className="w-full border border-gray-200 rounded-xl px-4 py-3 text-base resize-none focus:outline-none focus:ring-2 focus:ring-indigo-300 focus:border-transparent"
+                rows={3}
                 placeholder="コメントを入力..."
                 value={mutterCommentInput}
                 onChange={e => setMutterCommentInput(e.target.value)}
                 disabled={mutterCommentLoading}
               />
               <button
-                className="bg-blue-500 text-white rounded-md px-4 py-2 text-sm font-bold hover:bg-blue-600 disabled:opacity-60"
+                className="bg-indigo-600 text-white rounded-xl px-5 py-2.5 text-base font-medium hover:bg-indigo-700 disabled:opacity-60 shadow-sm hover:shadow transition-all"
                 onClick={() => postMutterComment(mutterCommentModalId)}
                 disabled={mutterCommentLoading || !mutterCommentInput.trim()}
               >{mutterCommentLoading ? '送信中...' : 'コメント送信'}</button>

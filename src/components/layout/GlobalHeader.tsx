@@ -8,6 +8,7 @@ import {
   LogOut,
   Pencil,
   Bell,
+  Settings,
 } from "lucide-react";
 import { DropdownMenu, DropdownMenuItem } from "@/components/ui/DropdownMenu";
 
@@ -35,6 +36,11 @@ const GlobalHeader: React.FC = () => {
   // 通知ベルクリック時
   const handleNotificationClick = () => {
     alert("通知機能は今後実装予定です");
+  };
+
+  // 設定アイコンクリック時
+  const handleSettingsClick = () => {
+    navigate("/settings");
   };
 
   return (
@@ -82,13 +88,14 @@ const GlobalHeader: React.FC = () => {
         </button>
         <DropdownMenu
           trigger={
-            <span>
+            <span className="cursor-pointer rounded-full p-2 hover:bg-indigo-50">
               <User className="h-6 w-6 text-indigo-700" />
             </span>
           }
         >
           <DropdownMenuItem icon={<User className="h-4 w-4 text-indigo-600" />} onClick={() => navigate("/portfolio")}>マイページ</DropdownMenuItem>
           <DropdownMenuItem icon={<Pencil className="h-4 w-4 text-indigo-600" />} onClick={() => navigate("/profile/edit")}>プロフィール編集</DropdownMenuItem>
+          <DropdownMenuItem icon={<Settings className="h-4 w-4 text-indigo-600" />} onClick={() => navigate("/settings")}>設定</DropdownMenuItem>
           <DropdownMenuItem icon={<LogOut className="h-4 w-4 text-red-500" />} onClick={handleLogout}>ログアウト</DropdownMenuItem>
         </DropdownMenu>
       </div>

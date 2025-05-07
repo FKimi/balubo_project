@@ -118,20 +118,48 @@ export const analyzeUserTagsApi = async (userId: string): Promise<{
   // 2. なければAI分析生成用のタグ頻度データを取得
   const { data: works, error: worksError } = await supabase
     .from('works')
-    .select('id, work_tags(tags(name))')
+    .select('id, title, work_tags(tag_id, tags(id, name, category))')
     .eq('user_id', userId);
+
   if (worksError || !works) {
+    console.error('作品データ取得エラー:', worksError);
     return { success: false, error: worksError?.message || '作品データの取得に失敗しました' };
+  }
+
+  if (works.length === 0) {
+    console.error('作品が見つかりません:', userId);
+    return { success: false, error: '作品データが見つかりません。作品を追加してください。' };
   }
 
   // タグ頻度集計
   const tagFrequency: Record<string, number> = {};
-  for (const work of works as { work_tags?: { tags?: { name: string }[] }[] }[]) {
-    const tags = (work.work_tags || []).flatMap((wt) => (wt.tags || []).map((t) => t.name));
-    for (const tag of tags) {
-      tagFrequency[tag] = (tagFrequency[tag] || 0) + 1;
+  let tagCount = 0;
+
+  for (const work of works) {
+    if (!work.work_tags || !Array.isArray(work.work_tags) || work.work_tags.length === 0) {
+      continue; // タグがない作品はスキップ
+    }
+
+    for (const workTag of work.work_tags) {
+      if (workTag.tags) {
+        // tagsが配列の場合は最初の要素を使用、オブジェクトの場合はそのまま使用
+        const tagData = Array.isArray(workTag.tags) ? workTag.tags[0] : workTag.tags;
+        
+        if (tagData && tagData.name) {
+          const tagName = tagData.name;
+          tagFrequency[tagName] = (tagFrequency[tagName] || 0) + 1;
+          tagCount++;
+        }
+      }
     }
   }
+
+  if (tagCount === 0) {
+    console.error('有効なタグが見つかりません:', userId);
+    return { success: false, error: 'タグデータが見つかりません。作品にタグを追加してください。' };
+  }
+
+  console.log('タグ頻度データ:', tagFrequency);
 
   // 3. AI分析生成
   const analysis = await analyzeUserTagsDirectly(tagFrequency);

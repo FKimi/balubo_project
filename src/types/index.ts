@@ -80,6 +80,7 @@ export interface Work {
   categoryIds?: string[]; // カスタムカテゴリID（複数）
   tagCategories?: TagCategory[]; // タグカテゴリ情報を追加
   published_date?: string; // 公開月（例: 2025-04）
+  memo?: string; // 制作メモ（作者による制作背景や工夫した点など）
 }
 
 // キャリア情報関連

@@ -32,6 +32,7 @@ const CareerEditInline: React.FC<Props> = ({ career, onSave, onCancel, loading, 
   });
   const [saving, setSaving] = useState(false);
   const [localError, setLocalError] = useState<string | null>(null);
+  const [saveSuccess, setSaveSuccess] = useState(false);
 
   const handleChange = (e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement>) => {
     const { name, value, type, checked } = e.target;
@@ -44,13 +45,28 @@ const CareerEditInline: React.FC<Props> = ({ career, onSave, onCancel, loading, 
   const handleSave = async () => {
     setLocalError(null);
     setSaving(true);
+    setSaveSuccess(false);
+    
     if (!form.company || !form.position || !form.start_date) {
       setLocalError("会社名・役職・開始日は必須です");
       setSaving(false);
       return;
     }
-    await onSave(form);
-    setSaving(false);
+    
+    try {
+      await onSave(form);
+      setSaveSuccess(true);
+      
+      // 保存が成功したら1秒後に閉じる
+      setTimeout(() => {
+        onCancel();
+      }, 1000);
+    } catch (error) {
+      console.error('保存中にエラーが発生しました:', error);
+      setLocalError("保存処理中にエラーが発生しました");
+    } finally {
+      setSaving(false);
+    }
   };
 
   return (
@@ -128,7 +144,12 @@ const CareerEditInline: React.FC<Props> = ({ career, onSave, onCancel, loading, 
           rows={2}
         />
       </div>
-      {(localError || error) && <div className="text-red-500 text-xs mb-2">{localError || error}</div>}
+      {(localError || error) && (
+        <div className="text-red-500 text-xs mb-2">{localError || error}</div>
+      )}
+      {saveSuccess && (
+        <div className="text-green-500 text-xs mb-2">保存しました！</div>
+      )}
       <div className="flex gap-2 mt-2">
         <Button type="button" onClick={handleSave} disabled={saving || loading}>
           {saving || loading ? "保存中..." : "保存"}

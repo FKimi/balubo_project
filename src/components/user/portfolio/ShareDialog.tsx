@@ -1,13 +1,45 @@
-import React from "react";
+import React, { useState } from "react";
 
 type Props = {
   open: boolean;
   profileUrl: string;
-  onCopy: () => void;
   onClose: () => void;
 };
 
-const ShareDialog: React.FC<Props> = ({ open, profileUrl, onCopy, onClose }) => {
+const ShareDialog: React.FC<Props> = ({ open, profileUrl, onClose }) => {
+  const [copied, setCopied] = useState(false);
+
+  const handleCopy = async () => {
+    try {
+      // モダンなNavigator Clipboard APIを使用
+      await navigator.clipboard.writeText(profileUrl);
+      setCopied(true);
+      // 3秒後にコピー状態をリセット
+      setTimeout(() => setCopied(false), 3000);
+    } catch (err) {
+      console.error('クリップボードコピーエラー:', err);
+      // フォールバック: 古い方法
+      const textArea = document.createElement('textarea');
+      textArea.value = profileUrl;
+      document.body.appendChild(textArea);
+      textArea.focus();
+      textArea.select();
+      try {
+        const success = document.execCommand('copy');
+        if (success) {
+          setCopied(true);
+          // 3秒後にコピー状態をリセット
+          setTimeout(() => setCopied(false), 3000);
+        } else {
+          console.error('クリップボードコピー失敗');
+        }
+      } catch (e) {
+        console.error('クリップボードコピーエラー (フォールバック):', e);
+      }
+      document.body.removeChild(textArea);
+    }
+  };
+
   if (!open) return null;
   return (
     <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
@@ -33,10 +65,10 @@ const ShareDialog: React.FC<Props> = ({ open, profileUrl, onCopy, onClose }) => 
             onClick={e => (e.target as HTMLInputElement).select()}
           />
           <button
-            className="bg-indigo-600 text-white px-4 rounded-r-md hover:bg-indigo-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-indigo-500"
-            onClick={onCopy}
+            className={`${copied ? 'bg-green-600' : 'bg-indigo-600'} text-white px-4 rounded-r-md hover:${copied ? 'bg-green-700' : 'bg-indigo-700'} focus:outline-none focus:ring-2 focus:ring-offset-2 focus:${copied ? 'ring-green-500' : 'ring-indigo-500'} transition-colors`}
+            onClick={handleCopy}
           >
-            コピー
+            {copied ? 'コピー済み' : 'コピー'}
           </button>
         </div>
         <div className="mt-4 flex justify-end">

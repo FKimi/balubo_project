@@ -753,20 +753,7 @@ const ProfileEdit = () => {
                   label="所在地"
                 />
               </div>
-              
-              <div>
-                <FormInput
-                  id="skills"
-                  name="skills"
-                  value={profile.skills?.join(', ') || ''}
-                  onChange={(e: React.ChangeEvent<HTMLInputElement>) => {
-                    const skills = e.target.value.split(',').map((skill: string) => skill.trim()).filter(Boolean);
-                    setProfile(prev => ({ ...prev, skills }));
-                  }}
-                  placeholder="スキル（カンマ区切りで入力）"
-                  label="スキル"
-                />
-              </div>
+
               
               <div>
                 <FormInput

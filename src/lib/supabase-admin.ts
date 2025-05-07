@@ -667,3 +667,34 @@ export const deleteWorkWithAdmin = async (workId: string) => {
     return { data: null, error };
   }
 };
+
+// 管理者権限で制作メモを取得する関数
+export const fetchWorkMemoWithAdmin = async (workId: string) => {
+  try {
+    console.log('管理者権限で制作メモを取得:', workId);
+    
+    const { data, error } = await supabaseAdmin
+      .from('work_memos')
+      .select('*')
+      .eq('work_id', workId)
+      .order('created_at', { ascending: false })
+      .limit(1)
+      .single();
+    
+    if (error) {
+      // メモが見つからない場合のエラー（PGRST116）は無視する
+      if (error.code === 'PGRST116') {
+        console.log('制作メモは登録されていません');
+        return { data: null, error: null };
+      }
+      
+      console.error('管理者権限での制作メモ取得エラー:', handleAdminError(error));
+      return { data: null, error: handleAdminError(error) };
+    }
+    
+    return { data, error: null };
+  } catch (err) {
+    console.error('管理者権限での制作メモ取得例外:', err);
+    return { data: null, error: err };
+  }
+};

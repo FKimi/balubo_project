@@ -1,5 +1,6 @@
-import React from "react";
+import React, { useState } from "react";
 import { Work, UserCategory } from '../../../types';
+import { formatYearMonth } from '../../../app/lib/utils/dateFormat';
 
 interface Props {
   userWorks: Work[];
@@ -8,6 +9,7 @@ interface Props {
   setCategoryTab: (id: string) => void;
   isCurrentUser: boolean;
   onWorkClick: (id: string) => void;
+  onAddCategory?: () => void;
 }
 
 const WorksSection: React.FC<Props> = ({
@@ -16,13 +18,14 @@ const WorksSection: React.FC<Props> = ({
   categoryTab,
   setCategoryTab,
   isCurrentUser,
-  onWorkClick
+  onWorkClick,
+  onAddCategory
 }) => {
   return (
     <div className="bg-white rounded-lg shadow-md p-4 md:p-6 mb-8">
       {/* 作品ジャンル用タブナビゲーション＋作品追加ボタン */}
       <div className="flex items-center justify-between mb-4">
-        <nav className="flex space-x-2">
+        <div className="flex items-center space-x-2 overflow-x-auto pb-2">
           <button
             className={`px-3 py-1 rounded text-sm font-medium transition-colors duration-150 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-indigo-500 ${categoryTab === 'all' ? "bg-indigo-600 text-white" : "bg-gray-100 text-gray-600 hover:bg-indigo-50"}`}
             onClick={() => setCategoryTab('all')}
@@ -40,16 +43,34 @@ const WorksSection: React.FC<Props> = ({
               type="button"
             >{cat.name}</button>
           ))}
-          {isCurrentUser && (
+          {isCurrentUser && onAddCategory && (
             <button
-              className="ml-4 px-5 py-2 bg-indigo-600 text-white rounded-full font-semibold shadow hover:bg-indigo-700 transition"
-              onClick={() => onWorkClick('create')}
+              className="px-3 py-1 rounded text-sm font-medium bg-white border border-dashed border-indigo-300 text-indigo-600 hover:bg-indigo-50 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-indigo-500 transition-colors duration-150"
+              onClick={onAddCategory}
               type="button"
             >
-              ＋ 作品を追加
+              <span className="flex items-center">
+                <svg className="w-3.5 h-3.5 mr-1" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M12 4v16m8-8H4"></path>
+                </svg>
+                カテゴリを追加
+              </span>
             </button>
           )}
-        </nav>
+        </div>
+
+        {isCurrentUser && (
+          <button
+            className="px-5 py-2 bg-indigo-600 text-white rounded-full font-semibold shadow hover:bg-indigo-700 transition flex items-center"
+            onClick={() => onWorkClick('create')}
+            type="button"
+          >
+            <svg className="w-4 h-4 mr-1.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M12 4v16m8-8H4"></path>
+            </svg>
+            作品を追加
+          </button>
+        )}
       </div>
       {/* 作品リスト: カスタムカテゴリでフィルタリング */}
       {userWorks.filter(work => categoryTab === 'all' || work.categoryIds?.includes(categoryTab)).length > 0 ? (
@@ -115,12 +136,7 @@ const WorksSection: React.FC<Props> = ({
                   )}
                   <div className="mt-3 flex items-center text-sm text-gray-500">
                     <span>
-                      {(() => {
-                        const dateStr = work.published_date || work.created_at;
-                        if (!dateStr) return '';
-                        // ISO文字列から日付部分だけ抽出（例: 2025-05-01）
-                        return dateStr.split('T')[0];
-                      })()}
+                      {formatYearMonth(work.published_date || work.created_at)}
                     </span>
                   </div>
                 </div>
