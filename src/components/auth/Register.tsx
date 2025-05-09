@@ -2,7 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { useNavigate, Link } from 'react-router-dom';
 import { supabase } from '../../lib/supabase';
 import { signInWithGoogle } from '../../lib/auth';
-import { Container } from '../../components/Container';
+import { Container } from '../layout/Container';
 import { Card, CardContent } from '../../components/Card';
 import { Button } from '../../components/Button';
 import { FormInput } from '../../components/FormInput';
