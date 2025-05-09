@@ -1,4 +1,4 @@
-import React, { useState, useCallback, FC } from 'react';
+import React, { useState, useCallback, FC, useEffect } from 'react';
 import { supabase } from '../../lib/supabase';
 import { useNavigate } from 'react-router-dom';
 import { Heart, MessageSquare, Plus } from 'lucide-react';
@@ -297,7 +297,7 @@ const Home: FC = () => {
     }
   }, []);
 
-  React.useEffect(() => {
+  useEffect(() => {
     if (feedType === 'works') {
       fetchRecentWorks();
     } else {
@@ -312,7 +312,7 @@ const Home: FC = () => {
       .eq('id', workId)
       .single();
     if (!error && data) {
-      setWorks(prev =>
+      setWorks((prev: Work[]) =>
         prev.map((w: Work) => w.id === workId
           ? { ...w, ...data, user: data.profiles }
           : w
@@ -373,7 +373,7 @@ const Home: FC = () => {
           .insert({ user_id: user.id, content_id: mutterId, content_type: 'mutter' });
         if (error) throw error;
       }
-      setMutters(prev => prev.map((m: Mutter) =>
+      setMutters((prev: Mutter[]) => prev.map((m: Mutter) =>
         m.id === mutterId
           ? {
               ...m,
@@ -415,7 +415,7 @@ const Home: FC = () => {
       if (error) throw error;
       setCommentInput('');
       await fetchComments(workId); 
-      setWorks(prev => prev.map((w: Work) => w.id === workId ? { ...w, comments: (w.comments ?? 0) + 1 } : w));
+      setWorks((prev: Work[]) => prev.map((w: Work) => w.id === workId ? { ...w, comments: (w.comments ?? 0) + 1 } : w));
     } catch {
       setCommentError('コメントの投稿に失敗しました');
     } finally {
@@ -449,14 +449,13 @@ const Home: FC = () => {
       if (error) throw error;
       setMutterCommentInput('');
       await fetchMutterComments(mutterId);
-      setMutters(prev => prev.map((m: Mutter) => m.id === mutterId ? { ...m, comments: (m.comments ?? 0) + 1 } : m));
+      setMutters((prev: Mutter[]) => prev.map((m: Mutter) => m.id === mutterId ? { ...m, comments: (m.comments ?? 0) + 1 } : m));
     } catch {
       setMutterCommentError('コメントの投稿に失敗しました');
     } finally {
       setMutterCommentLoading(false);
     }
   }, [mutterCommentInput, fetchMutterComments]);
-
 
   const closeCommentModal = useCallback(() => {
     setCommentModalWorkId(null);
@@ -478,9 +477,9 @@ const Home: FC = () => {
     setMutterCommentError(null);
   }, []);
 
-  const [mutterInput, setMutterInput] = React.useState('');
-  const [posting, setPosting] = React.useState(false);
-  const [inputError, setInputError] = React.useState('');
+  const [mutterInput, setMutterInput] = useState('');
+  const [posting, setPosting] = useState(false);
+  const [inputError, setInputError] = useState('');
 
   const postMutter = useCallback(async () => {
     if (!mutterInput.trim()) {

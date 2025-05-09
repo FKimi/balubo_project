@@ -22,7 +22,7 @@
     
     /* JSX設定 */
     "jsxImportSource": "react",
-    "types": ["react", "react-dom", "custom"],
+    "types": ["react", "react-dom"],
     
     /* Path Aliases */
     "baseUrl": ".",
@@ -44,7 +44,7 @@
       "@types/*": ["src/types/*"]
     }
   },
-  "include": ["src", "src/types/**/*.ts", "src/types/**/*.d.ts", "src/@types/**/*.d.ts"],
+  "include": ["src", "src/types/**/*.ts", "src/types/**/*.d.ts", "src/@types/**/*.d.ts", "src/custom.d.ts"],
   "references": [
     { "path": "./tsconfig.node.json" }
   ]

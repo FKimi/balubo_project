@@ -1397,7 +1397,46 @@ XRecommendedUsersコンポーネントで、プロフィール画像が登録さ
 
 ---
 
+ミューター（ぼやき）部分に適用されていますが、コメントモーダル内のアバター表示も統一するために修正しましょう：
 
+---
+
+```diff
+                            <img src={c.user.profile_image_url} alt="avatar" className="w-full h-full object-cover" />
+                          ) : (
+-                           <div className="w-6 h-6 text-gray-400 mx-auto my-1" />
++                           <div className="w-full h-full flex items-center justify-center bg-indigo-100 text-indigo-500">
++                             <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
++                               <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M16 7a4 4 0 11-8 0 4 4 0 018 0zM12 14a7 7 0 00-7 7h14a7 7 0 00-7-7z" />
++                             </svg>
++                           </div>
+                          )}
+                        </div>
+```
+
+```diff
+                            <img src={c.user.profile_image_url} alt="avatar" className="w-full h-full object-cover" />
+                          ) : (
+-                           <div className="w-6 h-6 text-gray-400 mx-auto my-1" />
++                           <div className="w-full h-full flex items-center justify-center bg-indigo-100 text-indigo-500">
++                             <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
++                               <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M16 7a4 4 0 11-8 0 4 4 0 018 0zM12 14a7 7 0 00-7 7h14a7 7 0 00-7-7z" />
++                             </svg>
++                           </div>
+                          )}
+                        </div>
+```
+
+---
+
+これで、プロフィール画像が登録されていないユーザーのアバター表示を改善しました。以下の変更を行いました：
+
+1. 存在しないデフォルト画像（/noavatar.png）の参照を削除
+2. スタイリッシュなSVGユーザーアイコンを実装
+3. アイコンのカラーをサイトのテーマカラー（indigo）に統一
+4. すべてのユーザーアバター表示（おすすめユーザー、フィード、コメント）で同じデザインを適用
+
+これにより、ユーザーアバターが統一され、より洗練された見た目になりました。また、存在しない画像を参照する問題も解決しています。
 
 ---
 

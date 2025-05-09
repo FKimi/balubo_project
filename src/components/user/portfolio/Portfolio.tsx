@@ -17,6 +17,7 @@ import AiAnalysisTab from './AiAnalysisTab'; // AI分析タブコンポーネン
 import CareerSection from './CareerSection'; // キャリアセクションコンポーネント
 import { AiAnalysis } from './AiAnalysisTab'; // タイプをインポート
 import CareerEditInline from './CareerEditInline'; // 追加: キャリア編集用コンポーネント
+import UserSidebar from '../UserSidebar'; // ユーザーサイドバーをインポート
 
 // Career型の定義（CareerEditInlineと共通）
 type Career = {
@@ -41,6 +42,9 @@ const Portfolio: FC = () => {
   const [selectedTab, setSelectedTab] = useState<string>("works");
   // 追加: 代表作品の状態
   const [featuredWorks, setFeaturedWorks] = useState<Work[]>([]);
+  
+  // サイドバーの状態管理
+  const [isSidebarOpen, setIsSidebarOpen] = useState(false);
 
   // --- AI分析関連の状態 ---
   const [isAiAnalysisEmpty, setIsAiAnalysisEmpty] = useState(true);
@@ -1179,22 +1183,28 @@ const Portfolio: FC = () => {
   }
 
   return (
-    <div className="min-h-screen bg-gray-50">
-      <ProfileHeader
-        userProfile={userProfile}
-        isCurrentUser={isCurrentUser}
-        onEditProfile={() => navigate('/profile/edit')}
-        onShare={toggleShareDialog}
-        followCount={followCount}
-        followerCount={followerCount}
-        isFollowing={isFollowing}
-        onFollow={handleFollow}
-        onUnfollow={handleUnfollow}
-        isFollowLoading={followLoading}
-      />
+    <div className="bg-gray-50 min-h-screen">
+      {/* サイドバー */}
+      <UserSidebar isOpen={isSidebarOpen} onClose={() => setIsSidebarOpen(false)} />
 
-      <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 pb-16">        
-        <div className="pt-6">
+      <div className="max-w-7xl mx-auto px-4 py-8">
+        {/* トップセクション */}
+        <div className="bg-white mb-6 border border-gray-100 shadow-sm rounded-2xl p-8">
+          <ProfileHeader
+            userProfile={userProfile}
+            isCurrentUser={isCurrentUser}
+            onEditProfile={() => navigate('/profile/edit')}
+            onShare={toggleShareDialog}
+            followCount={followCount}
+            followerCount={followerCount}
+            isFollowing={isFollowing}
+            onFollow={handleFollow}
+            onUnfollow={handleUnfollow}
+            isFollowLoading={followLoading}
+          />
+        </div>
+
+        <div className="mt-6">
           <TabNavigation
             tabs={[
               { label: '作品', value: 'works' },
