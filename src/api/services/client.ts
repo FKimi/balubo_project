@@ -1,5 +1,5 @@
 import { createClient } from '@supabase/supabase-js';
-import { Client, Project, Application, Contract } from '../../types';
+import { Client, Project, Application, Contract, UserProfile } from '../../types';
 
 // Supabaseクライアントの初期化
 const supabaseUrl = import.meta.env.VITE_SUPABASE_URL;
@@ -179,44 +179,44 @@ export async function getContracts(clientId: string): Promise<Contract[]> {
 /**
  * クリエイター検索API
  */
-export async function searchCreators(query: string): Promise<any[]> {
+export async function searchCreators(query: string): Promise<(UserProfile & { avatar_url: string })[]> {
   const { data, error } = await supabase
     .from('profiles')
     .select('*')
     .or(`full_name.ilike.%${query}%, about.ilike.%${query}%, headline.ilike.%${query}%`)
     .limit(10);
-  
+
   if (error) {
     console.error('クリエイター検索エラー:', error);
     return [];
   }
-  
+
   // profile_image_urlをavatar_urlとしてマッピング
-  return data.map(profile => ({
-    ...profile,
-    avatar_url: profile.profile_image_url
+  return (data || []).map((profile) => ({
+    ...(profile as UserProfile),
+    avatar_url: (profile as UserProfile).profile_image_url || '',
   }));
 }
 
 /**
  * おすすめクリエイター取得API
  */
-export async function getRecommendedCreators(): Promise<any[]> {
+export async function getRecommendedCreators(): Promise<(UserProfile & { avatar_url: string })[]> {
   const { data, error } = await supabase
     .from('profiles')
     .select('*')
     .not('profile_image_url', 'is', null)
     .order('created_at', { ascending: false })
     .limit(5);
-  
+
   if (error) {
     console.error('おすすめクリエイター取得エラー:', error);
     return [];
   }
-  
+
   // profile_image_urlをavatar_urlとしてマッピング
-  return data.map(profile => ({
-    ...profile,
-    avatar_url: profile.profile_image_url
+  return (data || []).map((profile) => ({
+    ...(profile as UserProfile),
+    avatar_url: (profile as UserProfile).profile_image_url || '',
   }));
 } 
