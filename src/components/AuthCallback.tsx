@@ -1,10 +1,11 @@
 import { useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { supabase } from '../lib/supabase';
-import { toast } from '../lib/hooks/useToast';
+import { useToast } from '../lib/hooks/useToast';
 
 export default function AuthCallback() {
   const navigate = useNavigate();
+  const toast = useToast();
 
   useEffect(() => {
     const handleAuthCallback = async () => {
@@ -111,6 +112,7 @@ export default function AuthCallback() {
     };
     
     handleAuthCallback();
+  // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [navigate]);
 
   return (

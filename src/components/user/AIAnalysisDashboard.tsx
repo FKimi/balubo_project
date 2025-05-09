@@ -1,7 +1,8 @@
-import { useState } from 'react';
+import React, { useState } from 'react';
 
-const AIAnalysisDashboard = () => {
+const AIAnalysisDashboard: React.FC = () => {
   const [clicked, setClicked] = useState(false);
+
   return (
     <div className="flex flex-col items-center justify-center min-h-screen bg-gradient-to-b from-gray-50 to-white p-4">
       <div className="max-w-3xl w-full bg-white rounded-2xl shadow-md border border-gray-100 p-8 text-center">

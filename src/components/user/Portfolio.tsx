@@ -210,7 +210,7 @@ const Portfolio: React.FC = () => {
       console.log('fetchUserProfile 処理完了');
     }
   // 依存配列から循環参照となっている関数を削除
-  }, [params.id, navigate, fetchFollowCounts]);
+  }, [params.id, navigate]);
 
   // ユーザーの作品一覧を取得する関数
   const fetchUserWorks = useCallback(async (userId: string) => {
