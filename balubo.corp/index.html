@@ -1,0 +1,142 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>株式会社balubo - 「物語」の力で、ビジネスを動かす</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Noto+Sans+JP:wght@400;700&display=swap" rel="stylesheet">
+    <link rel="stylesheet" href="css/style.css">
+</head>
+<body>
+    <!-- Header -->
+    <header class="header">
+        <div class="container">
+            <div class="header-content">
+                <div class="logo">
+                    <a href="#top">balubo</a>
+                </div>
+                <nav class="nav">
+                    <ul>
+                        <li><a href="#service">事業内容</a></li>
+                        <li><a href="#strength">強み</a></li>
+                        <li><a href="#company">会社概要</a></li>
+                        <li><a href="#contact">お問い合わせ</a></li>
+                    </ul>
+                </nav>
+            </div>
+        </div>
+    </header>
+
+    <!-- Key Visual -->
+    <section id="top" class="key-visual">
+        <div class="key-visual-overlay">
+            <div class="container">
+                <h1>「物語」の力で、ビジネスを動かす。</h1>
+            </div>
+        </div>
+    </section>
+
+    <!-- Problem -->
+    <section class="problem">
+        <div class="container">
+            <h2>こんなお悩みはありませんか？</h2>
+            <ul class="problem-list">
+                <li>「エンジニア採用に強いライターや編集者が見つからない…」</li>
+                <li>「コンテンツマーケティングを始めたいが、戦略から相談できるパートナーがいない…」</li>
+                <li>「記事だけでなく、動画やイベントも絡めた複合的な企画をしたい…」</li>
+            </ul>
+        </div>
+    </section>
+
+    <!-- Solution & Strength -->
+    <section id="strength" class="solution">
+        <div class="container">
+            <h2>baluboができること</h2>
+            <div class="solution-grid">
+                <div class="solution-card">
+                    <h3>技術領域・エンジニア採用に関する深い知見</h3>
+                    <p>専門性の高い技術コンテンツや、エンジニアの心に響く採用広報コンテンツを企画から制作まで一貫してサポートします。技術者向けメディアや大手経済メディアでの豊富な編集・企画経験に基づいています。</p>
+                </div>
+                <div class="solution-card">
+                    <h3>戦略的な企画力と多様なアウトプット</h3>
+                    <p>お客様の事業課題や目的に合わせ、記事・動画・イベントなどを組み合わせた最適なコンテンツ戦略をご提案します。スタートアップから大手企業まで、様々なフェーズの企業様との協業実績で培ったノウハウがあります。</p>
+                </div>
+            </div>
+        </div>
+    </section>
+
+    <!-- Service -->
+    <section id="service" class="service">
+        <div class="container">
+            <h2>事業内容</h2>
+            <div class="service-grid">
+                <div class="service-card">
+                    <h3>コンテンツ企画・制作事業</h3>
+                    <p>企業のブランディング、マーケティング、採用広報など、あらゆる課題をコンテンツの力で解決します。</p>
+                </div>
+                <div class="service-card">
+                    <h3>AIポートフォリオサービス「balubo」</h3>
+                    <p>クリエイターの価値を最大化するため、AIを活用したポートフォリオサービス「balubo」の開発も行っています。</p>
+                </div>
+            </div>
+        </div>
+    </section>
+
+    <!-- Company -->
+    <section id="company" class="company">
+        <div class="container">
+            <h2>会社概要</h2>
+            <dl class="company-info">
+                <dt>社名</dt>
+                <dd>株式会社balubo</dd>
+                <dt>所在地</dt>
+                <dd>〒150-0001 東京都 渋谷区 神宮前六丁目23番4号 桑野ビル2階</dd>
+                <dt>設立年月日</dt>
+                <dd>2023年4月1日</dd>
+            </dl>
+        </div>
+    </section>
+
+    <!-- Contact -->
+    <section id="contact" class="contact">
+        <div class="container">
+            <h2>お問い合わせ</h2>
+            <p>コンテンツ制作のご相談、サービスに関するご質問など、お気軽にお問い合わせください。</p>
+            <form class="contact-form" id="contactForm">
+                <div class="form-group">
+                    <label for="name">お名前 <span class="required">*</span></label>
+                    <input type="text" id="name" name="name" required>
+                </div>
+                <div class="form-group">
+                    <label for="company">会社名</label>
+                    <input type="text" id="company" name="company">
+                </div>
+                <div class="form-group">
+                    <label for="email">メールアドレス <span class="required">*</span></label>
+                    <input type="email" id="email" name="email" required>
+                </div>
+                <div class="form-group">
+                    <label for="message">お問い合わせ内容 <span class="required">*</span></label>
+                    <textarea id="message" name="message" rows="5" required></textarea>
+                </div>
+                <div class="form-error" id="formError"></div>
+                <button type="submit" class="submit-btn">送信する</button>
+            </form>
+        </div>
+    </section>
+
+    <!-- Footer -->
+    <footer class="footer">
+        <div class="container">
+            <div class="footer-content">
+                <div class="footer-logo">balubo</div>
+                <div class="footer-copyright">© balubo Inc. All Rights Reserved.</div>
+            </div>
+        </div>
+    </footer>
+
+    <script src="js/main.js"></script>
+</body>
+</html>
